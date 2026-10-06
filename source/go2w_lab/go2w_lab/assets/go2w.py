@@ -48,22 +48,28 @@ UNITREE_GO2W_CFG = ArticulationCfg(
     # 软限位因子
     soft_joint_pos_limit_factor=0.9,
     # 执行器配置
-    actuators={
-        "legs": ImplicitActuatorCfg(
+    actuators = {
+        # 腿部关节：PD 位置控制，施加电机力矩-转速衰减曲线
+        "legs": DCMotorCfg(
             joint_names_expr=["^(?!.*_foot_joint).*"],
-            effort_limit_sim=23.5,
-            velocity_limit_sim=30.0,
             stiffness=25.0,
             damping=0.5,
             friction=0.0,
+            saturation_effort=23.5,        # 对应原 effort_limit_sim，作为电机峰值/堵转力矩
+            velocity_limit=30.0,           # 对应原 velocity_limit_sim，作为电机理论空载转速
+            effort_limit=23.5,             # 显式硬裁剪限幅（与饱和力矩对齐）
+            armature=0.005,                # 显式积分建议配置电枢惯量，增强数值稳定性
         ),
-        "wheels": ImplicitActuatorCfg(
+        # 轮部关节：纯速度控制 (stiffness=0.0)，受反电动势衰减约束
+        "wheels": DCMotorCfg(
             joint_names_expr=[".*_foot_joint"],
-            effort_limit_sim=23.5,
-            velocity_limit_sim=30.0,
-            stiffness=0.0,
-            damping=0.5,
+            stiffness=0.0,                 # 速度控制模式保持刚度为 0
+            damping=0.5,                   # 由阻尼项提供速度闭环增益
             friction=0.0,
+            saturation_effort=23.5,        # 轮电机堵转力矩
+            velocity_limit=30.0,           # 轮电机极限空载角速度
+            effort_limit=23.5,
+            armature=0.001,
         ),
     },
 )
