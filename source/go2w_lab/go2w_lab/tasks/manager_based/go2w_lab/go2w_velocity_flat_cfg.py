@@ -275,14 +275,14 @@ class Go2W_VelocityFlatRewardsCfg:
     # (1) 平面水平线速度跟踪奖励 (XY 平面 vx, vy 跟踪)
     track_lin_vel_xy_exp = RewTerm(
         func=rewards.track_lin_vel_xy_exp,
-        weight=1.5,
+        weight=3.0,
         params={"command_name": "base_velocity", "std": 0.5},
     )
 
     # (2) 航向角速度跟踪奖励 (绕 Z 轴 wz 跟踪)
     track_ang_vel_z_exp = RewTerm(
         func=rewards.track_ang_vel_z_exp,
-        weight=0.75,
+        weight=1.5,
         params={"command_name": "base_velocity", "std": 0.5},
     )
 
@@ -331,30 +331,130 @@ class Go2W_VelocityFlatRewardsCfg:
     # (8) 电机扭矩惩罚：惩罚过大的关节输出力矩 (降低能耗与电机发热)
     dof_torques_l2 = RewTerm(
         func=rewards.joint_torques_l2,
-        weight=-1.0e-5,
+        weight=-2.5e-5,
+        params={
+            "asset_cfg": SceneEntityCfg(
+                name="robot",
+                joint_names=[".*_hip_joint", ".*_thigh_joint", ".*_calf_joint"],
+            ),
+        },
     )
 
     # (9) 关节限位惩罚：惩罚关节角度接近机械极限 (防止打到硬件硬限位)
     dof_pos_limits = RewTerm(
         func=rewards.joint_pos_limits,
         weight=-1.0,
+        params={
+            "asset_cfg": SceneEntityCfg(
+                name="robot",
+                joint_names=[".*_hip_joint", ".*_thigh_joint", ".*_calf_joint"],
+            ),
+        },
+    )
+
+    # (10) 关节角加速度惩罚 
+    joint_acc_l2 = RewTerm(
+        func=rewards.joint_acc_l2,
+        weight=-2.5e-7,  # 腿部对加速度敏感，惩罚较强
+        params={
+            "asset_cfg": SceneEntityCfg(
+                name="robot",
+                joint_names=[".*_hip_joint", ".*_thigh_joint", ".*_calf_joint"],
+            ),
+        },
+    )
+
+    # (11) 轮角加速度惩罚 
+    wheel_acc_l2 = RewTerm(
+        func=rewards.joint_acc_l2,
+        weight=-2.5e-9,  # 比腿部权重小 2~3 个数量级
+        params={
+            "asset_cfg": SceneEntityCfg(
+                name="robot",
+                joint_names=[".*_foot_joint"],  
+            ),
+        },
     )
 
     # -------------------------------------------------------------------------
     # 4. 自定义rewards（在mdp目录中）
     # -------------------------------------------------------------------------
 
-    # 机身高度惩罚项
-    base_height_l2 = RewTerm(
-        func=mdp.base_height_l2,
-        weight=-1.5,
+    # 引导机器人在静止 (零速度指令) 时所有脚稳稳踩在地上
+    feet_stand_well = RewTerm(
+        func=mdp.feet_stand_well,
+        weight=0.1,  # 踩地的脚越多得分越高，给正权重 (四足全部踩地时该项单步基础输出为 4.0)
         params={
-            "target_height": 0.4,  # 机器人站立时的理想期望高度 (米)
-            "asset_cfg": SceneEntityCfg("robot"),
-            "sensor_cfg": SceneEntityCfg("height_scanner_base"),  # 机身高度传感器
+            "command_name": "base_velocity",  # 对应 CommandManager 中的命令项名称
+            "sensor_cfg": SceneEntityCfg(
+                name="contact_forces",    # 对应 SceneCfg 中定义的传感器名称
+                body_names=".*_foot",          # 指定需统计的足端名称正则
+            ),
         },
     )
 
+    # 惩罚电机瞬时机械功耗，促进能量利用效率与平滑发力
+    joint_power_penalty = RewTerm(
+        func=mdp.joint_power,
+        weight=-2e-5,  # 功耗惩罚项，权重必须为负值（典型范围在 -1e-5 ~ -1e-4 之间）
+        params={
+            "asset_cfg": SceneEntityCfg(
+                name="robot",
+                # 若为轮足机器人（如 Go2-W），建议排除连续驱动的轮子，仅惩罚腿部关节：
+                joint_names=[".*_hip_joint", ".*_thigh_joint", ".*_calf_joint"],
+            ),
+        },
+    )
+
+    # 引导机器人在接收到静止指令时恢复到预设的标准站立姿态
+    stand_still_penalty= RewTerm(
+        func=mdp.stand_still,
+        weight=-0.2,  # 惩罚偏离默认姿态，权重必须为负值（通常在 -0.1 ~ -1.0 之间）
+        params={
+            "command_name": "base_velocity",  # 对应 CommandManager 中的命令项名称
+            "command_threshold": 0.06,        # 线速度与角速度综合模长阈值(m/s和rad/s)
+            "asset_cfg": SceneEntityCfg(
+                name="robot",
+                # 若为轮足（如 Go2-W），轮子本身是连续旋转无默认角度的，必须排除轮子：
+                joint_names=[".*_hip_joint", ".*_thigh_joint", ".*_calf_joint"],
+            ),
+        },
+    )
+
+    # 动静态结合约束关节姿态：行进时微弱约束保持步态美观，静止时强力约束归位标准站姿
+    joint_position_penalty = RewTerm(
+        func=mdp.joint_not_default,
+        weight=-0.1,  # 惩罚项权重设为负值（通常在 -0.05 ~ -0.5 之间）
+        params={
+            "command_name": "base_velocity",  # 对应 CommandManager 中的命令项名称
+            "stand_still_scale": 5.0,         # 静止时的放大倍率（静止惩罚力度变为 5 倍）
+            "velocity_threshold": 0.1,        # 机身平移线速度静止判定阈值 (m/s)
+            "command_threshold": 0.06,        # 指令模长静止判定阈值
+            "asset_cfg": SceneEntityCfg(
+                name="robot",
+                # 轮足必须排除连续旋转的轮子；普通足式机器人覆盖腿部各主动关节
+                joint_names=[".*_hip_joint", ".*_thigh_joint", ".*_calf_joint"],
+            ),
+        },
+    )
+
+    # 惩罚左右镜像关节的非对称开合，促进直行或站立时机身对称性
+    joint_mirror_penalty = RewTerm(
+        func=mdp.joint_mirror,
+        weight=-0.05,  # 惩罚项，权重设为负值（通常在 -0.01 ~ -0.1 之间）
+        params={
+            "asset_cfg": SceneEntityCfg("robot"),
+            # 传入成对的左右镜像关节名称
+            # 科学的步态对称与同步配对策略：
+            "mirror_joints": [
+                # 只限制腿部摆动关节：保持【对角交叉同步】（Trot 步态）
+                ["FL_thigh_joint", "RR_thigh_joint"],
+                ["FL_calf_joint", "RR_calf_joint"],
+                ["FR_thigh_joint", "RL_thigh_joint"],
+                ["FR_calf_joint", "RL_calf_joint"],
+            ],
+        },
+    )
 #=================================
 # Termination设置
 #=================================
