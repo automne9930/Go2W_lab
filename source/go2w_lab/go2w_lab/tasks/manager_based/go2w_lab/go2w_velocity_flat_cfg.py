@@ -15,7 +15,12 @@ from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.sensors import ContactSensorCfg, RayCasterCfg, patterns
 from isaaclab.utils import configclass
+# Observation所需
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
+# Action所需
+from isaaclab.envs.mdp import actions  # 导入官方预置的 Action 项实现
+from isaaclab.managers import ActionTermCfg as ActTerm
+
 
 from . import mdp
 
@@ -181,3 +186,38 @@ class Go2W_ObservationsCfg:
     # -------------------------------------------------------------------------
     policy: PolicyCfg = PolicyCfg()
     critic: CriticCfg = CriticCfg()
+
+#=================================
+# Action设置
+#=================================
+@configclass
+class Go2W_ActionsCfg:
+    """动作空间总配置"""
+
+    # -------------------------------------------------------------------------
+    # 1. 腿部关节动作项：关节位置控制 
+    # -------------------------------------------------------------------------
+    joint_pos = ActTerm(
+        class_type=actions.JointPositionActionCfg,
+        asset_name="robot",
+        # 通过正则过滤出 12 个腿部关节（排除 4 个轮子关节）
+        joint_names=["^(?!.*_foot_joint).*"],
+        # 动作缩放系数：28.6 度幅度，挑战动作更大一些
+        scale=0.5,
+        # 是否基于机器人默认姿态进行增量叠加（True 表示输出的是相对默认姿态的偏差）
+        use_default_offset=True,
+    )
+
+    # -------------------------------------------------------------------------
+    # 2. 轮子关节动作项：轮速控制 
+    # -------------------------------------------------------------------------
+    joint_vel = ActTerm(
+        class_type=actions.JointVelocityActionCfg,
+        asset_name="robot",
+        # 通过正则精准锁定 4 个轮子连续旋转关节
+        joint_names=[".*_foot_joint"],
+        # 动作缩放系数：满速20.0 rad/s，给大一些速度
+        scale=20.0,
+        # 轮子没有默认“默认角度”，直接控制目标转速，故不叠加默认偏置
+        use_default_offset=False,
+    )
