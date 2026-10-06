@@ -105,6 +105,8 @@ class Go2W_CommandsCfg:
         # 航向角度控制设置
         heading_command = True,     # True表示机器人随机下发的是yaw角度指令，False表示下发yaw角速度
         heading_control_stiffness=0.5,    # yaw角度到yaw角速度的P控制器，角度的底层还是通过速度控制
+        # 速度箭头显示
+        debug_vis=True,
         # 具体的采样物理范围字典
         ranges=commands.UniformVelocityCommandCfg.Ranges(
             lin_vel_x=(-1.5, 1.5),  # 期望前进/后退速度范围 (m/s)
