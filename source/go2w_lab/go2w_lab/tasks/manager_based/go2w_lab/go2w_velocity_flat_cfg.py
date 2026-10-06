@@ -1,4 +1,4 @@
-# Go2W-速度目标-平坦地面训练环境（作为base训练存在）
+# Go2W-速度目标-平坦地面训练环境
 
 # import导入
 # Scene所需
@@ -211,13 +211,13 @@ class Go2W_ObservationsCfg:
         # 【特权项 A】：机身真实线速度 (真机无高频精准传感器，仿真中直接取物理引擎真值，3维)
         base_lin_vel = ObsTerm(func=mdp.base_lin_vel)
 
-        # # 【特权项 B】：周围地形高程扫描图 (来自之前配置的 height_scanner 传感器，187维，在Flat任务中可以不使用)
-        # height_scan = ObsTerm(
-        #     func=mdp.height_scan,
-        #     params={"sensor_cfg": SceneEntityCfg("height_scanner")},
-        # )
+        # 【特权项 B】：周围地形高程扫描图 (来自之前配置的 height_scanner 传感器，187维，在Flat任务中可以不使用)
+        height_scan = ObsTerm(
+            func=mdp.height_scan,
+            params={"sensor_cfg": SceneEntityCfg("height_scanner")},
+        )
         
-        # sensors里还有一个雷达+一个力传感器，不过不在Observation里加入，而是作为后续Rewarsd打分使用
+        # sensors里还有一个雷达+一个力传感器，不过不在Observation里加入，而是作为后续Reward打分使用
 
         def __post_init__(self) -> None:
             self.enable_corruption = False  # Critic 评估要求纯净真值，不注入噪声
@@ -641,6 +641,17 @@ class Go2W_VelocityFlat_ManagerBasedEnv(ManagerBasedRLEnvCfg):
         if self.scene.contact_forces is not None:
             # 碰撞冲击属瞬态信号，紧随物理引擎高频步步监听 (200 Hz)
             self.scene.contact_forces.update_period = self.sim.dt
+
+        # 检查是否启用了地形等级的课程学习（curriculum）机制——如果启用，则为地形生成器开启课程学习模式
+        # 该机制会生成难度递增的地形，对策略训练非常有帮助
+        if getattr(self.curriculum, "terrain_levels", None) is not None:
+            # 如果地形生成器已实例化，则将其课程学习标志位置为 True
+            if self.scene.terrain.terrain_generator is not None:
+                self.scene.terrain.terrain_generator.curriculum = True
+        else:
+            # 如果未配置地形等级课程，且地形生成器存在，则关闭课程学习模式（使用随机或固定难度）
+            if self.scene.terrain.terrain_generator is not None:
+                self.scene.terrain.terrain_generator.curriculum = False
 
     def disable_zero_weight_rewards(self):
         """自剪枝方法：自动将权重为 0 的奖励项置为 None 避免浪费 GPU 计算资源"""
