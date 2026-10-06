@@ -23,6 +23,9 @@ from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
 # Action所需
 from isaaclab.envs.mdp import actions  # 导入官方预置的 Action 项实现
 from isaaclab.managers import ActionTermCfg as ActTerm
+# Reward所需
+from isaaclab.envs.mdp import rewards  # 官方预置的 Reward 计算函数库
+from isaaclab.managers import RewardTermCfg as RewTerm
 
 
 from . import mdp
@@ -136,7 +139,7 @@ class Go2W_ObservationsCfg:
         # (3) 速度指令 (手柄/上位机目标速度: vx, vy, wz，3维)
         velocity_commands = ObsTerm(
             func=mdp.generated_commands,
-            params={"command_name": "base_velocity"},
+            params={"command_name": "base_velocity"},   # 通过CmdTerm的名称相联系
         )
 
         # (4) 腿部关节相对位置 (12维: 髋、大腿、小腿)
@@ -252,4 +255,84 @@ class Go2W_ActionsCfg:
         scale=20.0,
         # 轮子没有默认“默认角度”，直接控制目标转速，故不叠加默认偏置
         use_default_offset=False,
+    )
+
+
+#=================================
+# Reward设置
+#=================================
+@configclass
+class Go2W_VelocityFlatRewardsCfg:
+    """Go2W平地速度追踪-奖励空间总配置"""
+
+    # -------------------------------------------------------------------------
+    # 1. 核心任务奖励 (Task Tracking Rewards) - 正权重
+    # -------------------------------------------------------------------------
+
+    # (1) 平面水平线速度跟踪奖励 (XY 平面 vx, vy 跟踪)
+    track_lin_vel_xy_exp = RewTerm(
+        func=rewards.track_lin_vel_xy_exp,
+        weight=1.5,
+        params={"command_name": "base_velocity", "std": 0.5},
+    )
+
+    # (2) 航向角速度跟踪奖励 (绕 Z 轴 wz 跟踪)
+    track_ang_vel_z_exp = RewTerm(
+        func=rewards.track_ang_vel_z_exp,
+        weight=0.75,
+        params={"command_name": "base_velocity", "std": 0.5},
+    )
+
+    # -------------------------------------------------------------------------
+    # 2. 姿态与稳定性约束 (Base Stability) - 负权重惩罚
+    # -------------------------------------------------------------------------
+
+    # (3) 抑制竖直方向颠簸：惩罚机身沿 Z 轴的垂直线速度 (防止机器人乱蹦乱跳)
+    lin_vel_z_l2 = RewTerm(
+        func=rewards.lin_vel_z_l2,
+        weight=-2.0,
+    )
+
+    # (4) 抑制翻滚与俯仰震荡：惩罚机身沿 XY 轴的角速度 (防止狗剧烈摇头晃脑、左右摇摆)
+    ang_vel_xy_l2 = RewTerm(
+        func=rewards.ang_vel_xy_l2,
+        weight=-0.05,
+    )
+
+    # (5) 机身姿态调平：惩罚非垂直方向的重力投影误差 (保持机身水平)
+    flat_orientation_l2 = RewTerm(
+        func=rewards.flat_orientation_l2,
+        weight=-1.0,
+    )
+
+    # (6) 违规触地惩罚：机身底盘、大腿磕碰地面时扣大分 (利用传感器实现防摔)
+    undesired_contacts = RewTerm(
+        func=rewards.undesired_contacts,
+        weight=-1.0,
+        params={
+            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=["base", ".*_thigh"]),    # 专门筛选出大腿和base基座（禁止触地）
+            "threshold": 1.0,
+        },
+    )
+
+    # -------------------------------------------------------------------------
+    # 3. 硬件寿命与平滑度正则化 (Regularization & Safety) - 负权重惩罚
+    # -------------------------------------------------------------------------
+
+    # (7) 动作平滑惩罚：惩罚相邻控制步之间的动作跳变 (抑制电机高频抖动，防止真机炸机)
+    action_rate_l2 = RewTerm(
+        func=rewards.action_rate_l2,
+        weight=-0.01,
+    )
+
+    # (8) 电机扭矩惩罚：惩罚过大的关节输出力矩 (降低能耗与电机发热)
+    dof_torques_l2 = RewTerm(
+        func=rewards.joint_torques_l2,
+        weight=-1.0e-5,
+    )
+
+    # (9) 关节限位惩罚：惩罚关节角度接近机械极限 (防止打到硬件硬限位)
+    dof_pos_limits = RewTerm(
+        func=rewards.joint_pos_limits,
+        weight=-1.0,
     )
