@@ -5,7 +5,6 @@ import math
 
 import isaaclab.sim as sim_utils
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg
-from isaaclab.envs import ManagerBasedRLEnvCfg
 from isaaclab.managers import EventTermCfg as EventTerm
 from isaaclab.managers import ObservationGroupCfg as ObsGroup
 from isaaclab.managers import ObservationTermCfg as ObsTerm
@@ -15,6 +14,7 @@ from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.sensors import ContactSensorCfg, RayCasterCfg, patterns
 from isaaclab.utils import configclass
+
 # Command所需
 from isaaclab.envs.mdp import commands  # 导入官方预置的 Command 生成项实现
 from isaaclab.managers import CommandTermCfg as CmdTerm
@@ -35,6 +35,9 @@ from isaaclab.managers import EventTermCfg as EventTerm
 # Curriculum所需
 from isaaclab.envs.mdp import curriculum  # 导入官方预置的课程学习逻辑
 from isaaclab.managers import CurriculumTermCfg as CurrTerm
+# ManageBased环境配置所需
+from isaaclab.envs import ManagerBasedRLEnvCfg
+
 
 from . import mdp
 
@@ -522,3 +525,63 @@ class Go2W_VelocityFlatCurriculumCfg:
             "range_multiplier": (0.1, 1.0),
         },
     )
+    
+#=================================
+# 总环境设置（采用robotlab同款配置）
+#=================================
+@configclass
+class Go2W_VelocityFlat_ManagerBasedEnv(ManagerBasedRLEnvCfg):
+    """平地地形运动速度跟踪强化学习环境总配置"""
+
+    # --- 场景与资产配置 ---
+    # 实例化场景：GPU 并行 4096 个子环境，环境间距 2.5 米
+    scene: Go2W_VelocityFlatSceneCfg = Go2W_VelocityFlatSceneCfg(num_envs=4096, env_spacing=2.5)
+
+    # --- 基础交互接口配置 ---
+    observations: Go2W_ObservationsCfg = Go2W_ObservationsCfg()                 # 观测空间 (Policy/Critic 输入)
+    actions: Go2W_ActionsCfg = Go2W_ActionsCfg()                                # 动作空间 (网络输出到执行器的映射)
+    commands: Go2W_CommandsCfg = Go2W_CommandsCfg()                             # 指令生成器 (目标速度/航向等任务输入)
+
+    # --- MDP 强化学习核心规则 ---
+    rewards: Go2W_VelocityFlatRewardsCfg = Go2W_VelocityFlatRewardsCfg()        # 奖励函数 (跟踪打分与正则化惩罚)
+    terminations: Go2W_TerminationsCfg = Go2W_TerminationsCfg()                 # 回合终止条件 (摔倒判死与超时截断)
+    events: Go2W_EventCfg = Go2W_EventCfg()                                     # 事件与域随机化 (初始位姿重置、推力扰动等)
+    curriculum: Go2W_VelocityFlatCurriculumCfg = Go2W_VelocityFlatCurriculumCfg()        # 课程学习 (地形与指令难度动态递进)
+
+    def __post_init__(self):
+        """配置实例化后的派生参数校准与跨模块联锁"""
+        # 通用控制时序设置
+        self.decimation = 4           # 控制降频比: 物理步走 4 次，策略网络推理 1 次 (50 Hz 决策)
+        self.episode_length_s = 20.0  # 单回合最大物理时长 20 秒 (20s / 0.02s = 1000 步截断)
+
+        # 物理引擎底层参数
+        self.sim.dt = 0.005           # PhysX 物理仿真步长 (200 Hz 计算刚体与接触)
+        self.sim.render_interval = self.decimation  # 渲染频率与策略决策周期对齐 (50 Hz 渲染)
+        self.sim.physics_material = self.scene.terrain.physics_material  # 全局绑定地形物理材质
+        self.sim.physx.gpu_max_rigid_patch_count = 10 * 2**15            # 扩容 GPU 接触补丁显存池，防止复杂碰撞溢出
+
+        # 传感器采样频率分流更新
+        if self.scene.height_scanner is not None:
+            # 几何高程射线开销大，按策略决策步降频更新 (50 Hz)
+            self.scene.height_scanner.update_period = self.decimation * self.sim.dt
+        if self.scene.contact_forces is not None:
+            # 碰撞冲击属瞬态信号，紧随物理引擎高频步步监听 (200 Hz)
+            self.scene.contact_forces.update_period = self.sim.dt
+
+        # 课程学习与地形生成器开关互锁
+        # 若配置了地形课程项，自动激活地形生成器的等级递进模式；反之则随机分布
+        if getattr(self.curriculum, "terrain_levels", None) is not None:
+            if self.scene.terrain.terrain_generator is not None:
+                self.scene.terrain.terrain_generator.curriculum = True
+        else:
+            if self.scene.terrain.terrain_generator is not None:
+                self.scene.terrain.terrain_generator.curriculum = False
+
+    def disable_zero_weight_rewards(self):
+        """自剪枝方法：自动将权重为 0 的奖励项置为 None，避免浪费 GPU 计算资源"""
+        for attr in dir(self.rewards):
+            if not attr.startswith("__"):
+                reward_attr = getattr(self.rewards, attr)
+                # 过滤掉非函数项且权重严格为 0 的奖励项
+                if not callable(reward_attr) and reward_attr.weight == 0:
+                    setattr(self.rewards, attr, None)

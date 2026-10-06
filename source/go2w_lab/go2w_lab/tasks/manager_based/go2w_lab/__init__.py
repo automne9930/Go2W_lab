@@ -12,12 +12,13 @@ from . import agents
 ##
 
 
+# 平地速度跟踪任务
 gym.register(
-    id="Template-Go2w-Lab-v0",
+    id="Go2w-Flat-Velocity-v0",
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
     disable_env_checker=True,
     kwargs={
-        "env_cfg_entry_point": f"{__name__}.go2w_lab_env_cfg:Go2wLabEnvCfg",
-        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:PPORunnerCfg",
+        "env_cfg_entry_point": f"{__name__}.go2w_velocity_flat_cfg:Go2W_VelocityFlat_ManagerBasedEnv",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:Go2WFlatPPORunnerCfg",
     },
 )
