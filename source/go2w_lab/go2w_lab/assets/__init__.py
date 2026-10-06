@@ -21,3 +21,8 @@ ISAACLAB_ASSETS_METADATA = toml.load(os.path.join(ISAACLAB_ASSETS_EXT_DIR, "conf
 
 # 从配置中动态提取版本号
 __version__ = ISAACLAB_ASSETS_METADATA["package"]["version"]
+
+##
+# 导出本包内的机器人资产配置
+##
+from .go2w import UNITREE_GO2W_CFG  # noqa: F401, E402

@@ -1,25 +1,18 @@
 # Go2W-速度目标-平坦地面训练环境（作为base训练存在）
 
 # import导入
-import math
-
-import isaaclab.sim as sim_utils
-from isaaclab.assets import ArticulationCfg, AssetBaseCfg
-from isaaclab.managers import EventTermCfg as EventTerm
-from isaaclab.managers import ObservationGroupCfg as ObsGroup
-from isaaclab.managers import ObservationTermCfg as ObsTerm
-from isaaclab.managers import RewardTermCfg as RewTerm
+# Scene所需
 from isaaclab.managers import SceneEntityCfg
-from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.scene import InteractiveSceneCfg
-from isaaclab.sensors import ContactSensorCfg, RayCasterCfg, patterns
-from isaaclab.utils import configclass
-
+from isaaclab.assets import ArticulationCfg, AssetBaseCfg
 # Command所需
 from isaaclab.envs.mdp import commands  # 导入官方预置的 Command 生成项实现
 from isaaclab.managers import CommandTermCfg as CmdTerm
 # Observation所需
-from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
+from isaaclab.managers import ObservationGroupCfg as ObsGroup
+from isaaclab.managers import ObservationTermCfg as ObsTerm
+from isaaclab.sensors import ContactSensorCfg, RayCasterCfg, patterns   # 传感器
+from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise      # 噪声
 # Action所需
 from isaaclab.envs.mdp import actions  # 导入官方预置的 Action 项实现
 from isaaclab.managers import ActionTermCfg as ActTerm
@@ -39,6 +32,9 @@ from isaaclab.managers import CurriculumTermCfg as CurrTerm
 from isaaclab.envs import ManagerBasedRLEnvCfg
 
 
+import math
+import isaaclab.sim as sim_utils
+from isaaclab.utils import configclass
 from . import mdp
 
 # 资产导入
@@ -102,8 +98,7 @@ class Go2W_CommandsCfg:
     # -------------------------------------------------------------------------
     # 机身底盘速度跟踪指令：模拟手柄遥控机器人的 (vx, vy, wz)
     # -------------------------------------------------------------------------
-    base_velocity = CmdTerm(
-        class_type=commands.UniformVelocityCommandCfg,
+    base_velocity = commands.UniformVelocityCommandCfg(
         # 绑定的目标资产实体（指示该速度指令以哪个刚体的局部坐标系为基准）
         asset_name="robot",
         # 重采样周期范围：每隔 10.0 到 10.0 秒（即固定 10 秒）为机器人更换一次新指令
@@ -150,7 +145,7 @@ class Go2W_ObservationsCfg:
         # (3) 速度指令 (手柄/上位机目标速度: vx, vy, wz，3维)
         velocity_commands = ObsTerm(
             func=mdp.generated_commands,
-            params={"command_name": "base_velocity"},   # 通过CmdTerm的名称相联系
+            params={"command_name": "base_velocity"},   # 通过指令项的名字取回 (vx, vy, wz)
         )
 
         # (4) 腿部关节相对位置 (12维: 髋、大腿、小腿)
@@ -243,8 +238,7 @@ class Go2W_ActionsCfg:
     # -------------------------------------------------------------------------
     # 1. 腿部关节动作项：关节位置控制 
     # -------------------------------------------------------------------------
-    joint_pos = ActTerm(
-        class_type=actions.JointPositionActionCfg,
+    joint_pos = actions.JointPositionActionCfg(
         asset_name="robot",
         # 通过正则过滤出 12 个腿部关节（排除 4 个轮子关节）
         joint_names=["^(?!.*_foot_joint).*"],
@@ -257,8 +251,7 @@ class Go2W_ActionsCfg:
     # -------------------------------------------------------------------------
     # 2. 轮子关节动作项：轮速控制 
     # -------------------------------------------------------------------------
-    joint_vel = ActTerm(
-        class_type=actions.JointVelocityActionCfg,
+    joint_vel = actions.JointVelocityActionCfg(
         asset_name="robot",
         # 通过正则精准锁定 4 个轮子连续旋转关节
         joint_names=[".*_foot_joint"],
@@ -488,44 +481,12 @@ class Go2W_EventCfg:
 
 
 #=================================
-# Curriculum设置
+# Curriculum设置（暂时不启用）
 #=================================
 @configclass
-class Go2W_VelocityFlatCurriculumCfg:
-    """Go2W-速度平地-课程学习总配置"""
+class Empty_CurriculumCfg:
+    pass 
 
-    # -------------------------------------------------------------------------
-    # 1. 地形难度课程：根据速度跟踪表现动态迁移地形难度等级 (0 ~ max_level)
-    # -------------------------------------------------------------------------
-    # 平地训练无地形难度配置
-    # terrain_levels = CurrTerm(
-    #     func=curriculum.terrain_levels_vel,
-    # )
-
-    # -------------------------------------------------------------------------
-    # 2. 线速度范围扩容课程：当水平速度跟踪打分优秀时，按比例放大线速度采样区间
-    # -------------------------------------------------------------------------
-    command_levels_lin_vel = CurrTerm(
-        func=curriculum.command_levels_lin_vel,
-        params={
-            # 考核的奖励项名称：直接关联 RewardsCfg 里的 track_lin_vel_xy_exp
-            "reward_term_name": "track_lin_vel_xy_exp",
-            # 指令范围缩放倍率：从原始 Ranges 的 0.1 倍逐步渐进扩容到 1.0 倍
-            "range_multiplier": (0.1, 1.0),
-        },
-    )
-
-    # -------------------------------------------------------------------------
-    # 3. 角速度范围扩容课程：当转向角速度跟踪打分达标时，逐步放宽自转速度指令上限
-    # -------------------------------------------------------------------------
-    command_levels_ang_vel = CurrTerm(
-        func=curriculum.command_levels_ang_vel,
-        params={
-            "reward_term_name": "track_ang_vel_z_exp",
-            "range_multiplier": (0.1, 1.0),
-        },
-    )
-    
 #=================================
 # 总环境设置（采用robotlab同款配置）
 #=================================
@@ -546,7 +507,7 @@ class Go2W_VelocityFlat_ManagerBasedEnv(ManagerBasedRLEnvCfg):
     rewards: Go2W_VelocityFlatRewardsCfg = Go2W_VelocityFlatRewardsCfg()        # 奖励函数 (跟踪打分与正则化惩罚)
     terminations: Go2W_TerminationsCfg = Go2W_TerminationsCfg()                 # 回合终止条件 (摔倒判死与超时截断)
     events: Go2W_EventCfg = Go2W_EventCfg()                                     # 事件与域随机化 (初始位姿重置、推力扰动等)
-    curriculum: Go2W_VelocityFlatCurriculumCfg = Go2W_VelocityFlatCurriculumCfg()        # 课程学习 (地形与指令难度动态递进)
+    curriculum: Empty_CurriculumCfg = Empty_CurriculumCfg()                     # 课程学习 (地形与指令难度动态递进)
 
     def __post_init__(self):
         """配置实例化后的派生参数校准与跨模块联锁"""
@@ -557,7 +518,8 @@ class Go2W_VelocityFlat_ManagerBasedEnv(ManagerBasedRLEnvCfg):
         # 物理引擎底层参数
         self.sim.dt = 0.005           # PhysX 物理仿真步长 (200 Hz 计算刚体与接触)
         self.sim.render_interval = self.decimation  # 渲染频率与策略决策周期对齐 (50 Hz 渲染)
-        self.sim.physics_material = self.scene.terrain.physics_material  # 全局绑定地形物理材质
+        # 全局物理材质取自地面：本任务是平地，场景里只有 ground，没有 terrain 项
+        self.sim.physics_material = self.scene.ground.spawn.physics_material
         self.sim.physx.gpu_max_rigid_patch_count = 10 * 2**15            # 扩容 GPU 接触补丁显存池，防止复杂碰撞溢出
 
         # 传感器采样频率分流更新
@@ -568,17 +530,8 @@ class Go2W_VelocityFlat_ManagerBasedEnv(ManagerBasedRLEnvCfg):
             # 碰撞冲击属瞬态信号，紧随物理引擎高频步步监听 (200 Hz)
             self.scene.contact_forces.update_period = self.sim.dt
 
-        # 课程学习与地形生成器开关互锁
-        # 若配置了地形课程项，自动激活地形生成器的等级递进模式；反之则随机分布
-        if getattr(self.curriculum, "terrain_levels", None) is not None:
-            if self.scene.terrain.terrain_generator is not None:
-                self.scene.terrain.terrain_generator.curriculum = True
-        else:
-            if self.scene.terrain.terrain_generator is not None:
-                self.scene.terrain.terrain_generator.curriculum = False
-
     def disable_zero_weight_rewards(self):
-        """自剪枝方法：自动将权重为 0 的奖励项置为 None，避免浪费 GPU 计算资源"""
+        """自剪枝方法：自动将权重为 0 的奖励项置为 None 避免浪费 GPU 计算资源"""
         for attr in dir(self.rewards):
             if not attr.startswith("__"):
                 reward_attr = getattr(self.rewards, attr)
