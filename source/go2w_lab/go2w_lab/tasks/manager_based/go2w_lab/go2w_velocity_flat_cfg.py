@@ -26,7 +26,9 @@ from isaaclab.managers import ActionTermCfg as ActTerm
 # Reward所需
 from isaaclab.envs.mdp import rewards  # 官方预置的 Reward 计算函数库
 from isaaclab.managers import RewardTermCfg as RewTerm
-
+# Termination所需
+from isaaclab.envs.mdp import terminations  # 导入官方预置的终止判定函数
+from isaaclab.managers import TerminationTermCfg as DoneTerm
 
 from . import mdp
 
@@ -335,4 +337,55 @@ class Go2W_VelocityFlatRewardsCfg:
     dof_pos_limits = RewTerm(
         func=rewards.joint_pos_limits,
         weight=-1.0,
+    )
+
+#=================================
+# Termination设置
+#=================================
+@configclass
+class Go2W_TerminationsCfg:
+    """终止条件总配置"""
+
+    # -------------------------------------------------------------------------
+    # 1. 超时终止 (Truncation): 回合步数到达上限
+    # -------------------------------------------------------------------------
+    time_out = DoneTerm(
+        func=terminations.time_out,
+        time_out=True,  # 【关键】：标记为 Truncation，算法底层据此开启价值自举 (Bootstrapping)
+    )
+
+    # -------------------------------------------------------------------------
+    # 2. 违规接触/摔倒终止 (Termination): 底盘或躯干砸地
+    # -------------------------------------------------------------------------
+    illegal_contact = DoneTerm(
+        func=terminations.illegal_contact,
+        params={
+            # 关联场景中之前配置的接触力传感器，监听 base(机身) 和 thigh(大腿)
+            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=["base", ".*_thigh"]),
+            # 撞击力阈值 (牛顿)：只要检测到受力大于 1.0 N，立即判死重置
+            "threshold": 1.0,
+        },
+    )
+
+    # -------------------------------------------------------------------------
+    # 3. 姿态倾覆终止 (Termination): 机身严重侧翻或底朝天
+    # -------------------------------------------------------------------------
+    bad_orientation = DoneTerm(
+        func=terminations.bad_orientation,
+        params={
+            # 重力投影 Z 轴阈值：标准水平站立时重力在机身 Z 轴投影约为 -1.0
+            # 当该值大于 -0.2 时，说明机身仰角/侧倾角已超过约 78°，判定为翻车
+            "limit_angle": 1.36,  # 弧度 (约 78 度)
+        },
+    )
+
+    # -------------------------------------------------------------------------
+    # 4. 跌落深渊/走出边界终止 (Termination)
+    # -------------------------------------------------------------------------
+    root_height_below_minimum = DoneTerm(
+        func=terminations.root_height_below_minimum,
+        params={
+            # 当机器狗掉落高度低于 -0.5 米（从高台或崎岖悬崖跌落）时直接重置
+            "minimum_height": -0.5,
+        },
     )
