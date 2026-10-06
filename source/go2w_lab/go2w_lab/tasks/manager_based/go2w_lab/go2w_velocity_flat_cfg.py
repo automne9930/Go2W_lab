@@ -211,11 +211,11 @@ class Go2W_ObservationsCfg:
         # 【特权项 A】：机身真实线速度 (真机无高频精准传感器，仿真中直接取物理引擎真值，3维)
         base_lin_vel = ObsTerm(func=mdp.base_lin_vel)
 
-        # 【特权项 B】：前方地形高程扫描图 (来自之前配置的 height_scanner 传感器，187维)
-        height_scan = ObsTerm(
-            func=mdp.height_scan,
-            params={"sensor_cfg": SceneEntityCfg("height_scanner")},
-        )
+        # # 【特权项 B】：周围地形高程扫描图 (来自之前配置的 height_scanner 传感器，187维，在Flat任务中可以不使用)
+        # height_scan = ObsTerm(
+        #     func=mdp.height_scan,
+        #     params={"sensor_cfg": SceneEntityCfg("height_scanner")},
+        # )
         
         # sensors里还有一个雷达+一个力传感器，不过不在Observation里加入，而是作为后续Rewarsd打分使用
 
@@ -243,8 +243,8 @@ class Go2W_ActionsCfg:
         asset_name="robot",
         # 通过正则过滤出 12 个腿部关节（排除 4 个轮子关节）
         joint_names=["^(?!.*_foot_joint).*"],
-        # 动作缩放系数：28.6 度幅度，挑战动作更大一些
-        scale=0.5,
+        # 动作缩放系数：14.3 度幅度
+        scale=0.25,
         # 是否基于机器人默认姿态进行增量叠加（True 表示输出的是相对默认姿态的偏差）
         use_default_offset=True,
     )
@@ -256,8 +256,8 @@ class Go2W_ActionsCfg:
         asset_name="robot",
         # 通过正则精准锁定 4 个轮子连续旋转关节
         joint_names=[".*_foot_joint"],
-        # 动作缩放系数：满速20.0 rad/s，给大一些速度
-        scale=20.0,
+        # 动作缩放系数：满速10.0 rad/s
+        scale=10.0,
         # 轮子没有默认“默认角度”，直接控制目标转速，故不叠加默认偏置
         use_default_offset=False,
     )
@@ -446,15 +446,11 @@ class Go2W_VelocityFlatRewardsCfg:
         weight=-0.05,  # 惩罚项，权重设为负值（通常在 -0.01 ~ -0.1 之间）
         params={
             "asset_cfg": SceneEntityCfg("robot"),
-            # 传入成对的左右镜像关节名称
-            # 科学的步态对称与同步配对策略：
+            # 传入成对的左右镜像关节名称（斜角对应）
             "mirror_joints": [
-                # 只限制腿部摆动关节：保持【对角交叉同步】（Trot 步态）
-                ["FL_thigh_joint", "RR_thigh_joint"],
-                ["FL_calf_joint", "RR_calf_joint"],
-                ["FR_thigh_joint", "RL_thigh_joint"],
-                ["FR_calf_joint", "RL_calf_joint"],
-            ],
+            ["FR_(hip|thigh|calf).*", "RL_(hip|thigh|calf).*"],
+            ["FL_(hip|thigh|calf).*", "RR_(hip|thigh|calf).*"],
+            ]
         },
     )
 #=================================
