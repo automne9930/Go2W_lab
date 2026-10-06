@@ -29,6 +29,9 @@ from isaaclab.managers import RewardTermCfg as RewTerm
 # Termination所需
 from isaaclab.envs.mdp import terminations  # 导入官方预置的终止判定函数
 from isaaclab.managers import TerminationTermCfg as DoneTerm
+# Event所需
+from isaaclab.envs.mdp import events  # 导入官方预置的事件函数库
+from isaaclab.managers import EventTermCfg as EventTerm
 
 from . import mdp
 
@@ -387,5 +390,92 @@ class Go2W_TerminationsCfg:
         params={
             # 当机器狗掉落高度低于 -0.5 米（从高台或崎岖悬崖跌落）时直接重置
             "minimum_height": -0.5,
+        },
+    )
+
+#=================================
+# Event设置
+#=================================
+@configclass
+class Go2W_EventCfg:
+    """事件与域随机化总配置"""
+
+    # -------------------------------------------------------------------------
+    # 1. 启动期随机化 (Startup Mode) - 训练前只执行一次
+    # -------------------------------------------------------------------------
+
+    # (1) 机身附加质量随机化：模拟不同传感器挂载重量 (例如加装 0 ~ 3 kg 载荷)
+    add_base_mass = EventTerm(
+        func=events.randomize_rigid_body_mass,
+        mode="startup",
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names="base"),
+            "mass_distribution_params": (-1.0, 3.0),  # 允许机身质量浮动 -1kg 到 +3kg
+            "operation": "add",
+        },
+    )
+
+    # -------------------------------------------------------------------------
+    # 2. 回合重置事件 (Reset Mode) - 每次环境重置时触发
+    # -------------------------------------------------------------------------
+
+    # (2) 重置机器人根节点状态：放置回地面，并叠加小范围的随机位置与偏航朝向
+    reset_base = EventTerm(
+        func=events.reset_root_state_uniform,
+        mode="reset",
+        params={
+            "pose_range": {
+                "x": (-0.5, 0.5),
+                "y": (-0.5, 0.5),
+                "yaw": (-3.14, 3.14),  # 出生时随机朝向
+            },
+            "velocity_range": {
+                "x": (-0.5, 0.5),
+                "y": (-0.5, 0.5),
+                "z": (-0.5, 0.5),
+                "roll": (-0.5, 0.5),
+                "pitch": (-0.5, 0.5),
+                "yaw": (-0.5, 0.5),
+            },
+            "asset_cfg": SceneEntityCfg("robot"),
+        },
+    )
+
+    # (3) 重置关节状态：在机器人标称默认姿态基础上，随机偏移小角度
+    reset_robot_joints = EventTerm(
+        func=events.reset_joints_by_scale,
+        mode="reset",
+        params={
+            "position_range": (0.5, 1.5),  # 关节角度在标称姿态的 0.5 ~ 1.5 倍之间波动
+            "velocity_range": (0.0, 0.0),  # 重置时初始关节速度清零
+            "asset_cfg": SceneEntityCfg("robot"),
+        },
+    )
+
+    # (4) 物理摩擦力随机化：每次重置时随机分配地表静态摩擦力 (0.4 ~ 1.25)
+    physics_material = EventTerm(
+        func=events.randomize_rigid_body_material,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("robot"),
+            "static_friction_range": (0.4, 1.25),   # 模拟瓷砖地到粗糙水泥地
+            "dynamic_friction_range": (0.4, 1.25),
+            "restitution_range": (0.0, 0.0),        # 弹性恢复系数
+            "num_buckets": 64,                      # 划分 64 个材质桶提升并行性能
+        },
+    )
+
+    # -------------------------------------------------------------------------
+    # 3. 运行中扰动事件 (Interval Mode) - 训练过程中周期性突发
+    # -------------------------------------------------------------------------
+
+    # (5) 突发外力冲击 (踢狗机制)：每隔 8 秒随机给机身线速度注入突变，检验抗跌倒能力
+    push_robot = EventTerm(
+        func=events.push_by_setting_velocity,
+        mode="interval",
+        interval_range_s=(6.0, 10.0),  # 每隔 6 ~ 10 秒随机挑一个时刻
+        params={
+            "velocity_range": {"x": (-1.0, 1.0), "y": (-1.0, 1.0)},  # 突加 +/-1.0 m/s 的横向/纵向冲量
+            "asset_cfg": SceneEntityCfg("robot"),
         },
     )
