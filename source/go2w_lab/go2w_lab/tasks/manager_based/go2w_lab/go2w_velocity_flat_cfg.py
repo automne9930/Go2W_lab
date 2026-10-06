@@ -15,6 +15,9 @@ from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.sensors import ContactSensorCfg, RayCasterCfg, patterns
 from isaaclab.utils import configclass
+# Command所需
+from isaaclab.envs.mdp import commands  # 导入官方预置的 Command 生成项实现
+from isaaclab.managers import CommandTermCfg as CmdTerm
 # Observation所需
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
 # Action所需
@@ -72,6 +75,35 @@ class Go2W_VelocityFlatSceneCfg(InteractiveSceneCfg):
     dome_light = AssetBaseCfg(
         prim_path="/World/DomeLight",
         spawn=sim_utils.DomeLightCfg(color=(0.9, 0.9, 0.9), intensity=500.0),
+    )
+
+
+#=================================
+# Command设置
+#=================================
+@configclass
+class Go2W_CommandsCfg:
+    """指令空间总配置"""
+
+    # -------------------------------------------------------------------------
+    # 机身底盘速度跟踪指令：模拟手柄遥控机器人的 (vx, vy, wz)
+    # -------------------------------------------------------------------------
+    base_velocity = CmdTerm(
+        class_type=commands.UniformVelocityCommandCfg,
+        # 绑定的目标资产实体（指示该速度指令以哪个刚体的局部坐标系为基准）
+        asset_name="robot",
+        # 重采样周期范围：每隔 10.0 到 10.0 秒（即固定 10 秒）为机器人更换一次新指令
+        resampling_time_range=(10.0, 10.0),
+        # 航向角度控制设置
+        heading_command = True,     # True表示机器人随机下发的是yaw角度指令，False表示下发yaw角速度
+        heading_control_stiffness=0.5,    # yaw角度到yaw角速度的P控制器，角度的底层还是通过速度控制
+        # 具体的采样物理范围字典
+        ranges=commands.UniformVelocityCommandCfg.Ranges(
+            lin_vel_x=(-1.5, 1.5),  # 期望前进/后退速度范围 (m/s)
+            lin_vel_y=(-0.5, 0.5),  # 期望侧向平移速度范围 (m/s，轮足通常横向受限，范围略小)
+            ang_vel_z=(-1.0, 1.0),  # 期望原地自转角速度范围 (rad/s)，如果heading_command = True，则本项作为P控制器输出后的限幅存在
+            heading=(-3.14, 3.14),  # 期望航向朝向角范围 (rad)
+        ),
     )
 
 #=================================
