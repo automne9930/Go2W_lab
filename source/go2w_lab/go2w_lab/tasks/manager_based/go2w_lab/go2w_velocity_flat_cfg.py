@@ -32,6 +32,9 @@ from isaaclab.managers import TerminationTermCfg as DoneTerm
 # Event所需
 from isaaclab.envs.mdp import events  # 导入官方预置的事件函数库
 from isaaclab.managers import EventTermCfg as EventTerm
+# Curriculum所需
+from isaaclab.envs.mdp import curriculum  # 导入官方预置的课程学习逻辑
+from isaaclab.managers import CurriculumTermCfg as CurrTerm
 
 from . import mdp
 
@@ -477,5 +480,45 @@ class Go2W_EventCfg:
         params={
             "velocity_range": {"x": (-1.0, 1.0), "y": (-1.0, 1.0)},  # 突加 +/-1.0 m/s 的横向/纵向冲量
             "asset_cfg": SceneEntityCfg("robot"),
+        },
+    )
+
+
+#=================================
+# Curriculum设置
+#=================================
+@configclass
+class Go2W_VelocityFlatCurriculumCfg:
+    """Go2W-速度平地-课程学习总配置"""
+
+    # -------------------------------------------------------------------------
+    # 1. 地形难度课程：根据速度跟踪表现动态迁移地形难度等级 (0 ~ max_level)
+    # -------------------------------------------------------------------------
+    # 平地训练无地形难度配置
+    # terrain_levels = CurrTerm(
+    #     func=curriculum.terrain_levels_vel,
+    # )
+
+    # -------------------------------------------------------------------------
+    # 2. 线速度范围扩容课程：当水平速度跟踪打分优秀时，按比例放大线速度采样区间
+    # -------------------------------------------------------------------------
+    command_levels_lin_vel = CurrTerm(
+        func=curriculum.command_levels_lin_vel,
+        params={
+            # 考核的奖励项名称：直接关联 RewardsCfg 里的 track_lin_vel_xy_exp
+            "reward_term_name": "track_lin_vel_xy_exp",
+            # 指令范围缩放倍率：从原始 Ranges 的 0.1 倍逐步渐进扩容到 1.0 倍
+            "range_multiplier": (0.1, 1.0),
+        },
+    )
+
+    # -------------------------------------------------------------------------
+    # 3. 角速度范围扩容课程：当转向角速度跟踪打分达标时，逐步放宽自转速度指令上限
+    # -------------------------------------------------------------------------
+    command_levels_ang_vel = CurrTerm(
+        func=curriculum.command_levels_ang_vel,
+        params={
+            "reward_term_name": "track_ang_vel_z_exp",
+            "range_multiplier": (0.1, 1.0),
         },
     )
