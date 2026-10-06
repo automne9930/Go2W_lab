@@ -26,8 +26,7 @@ from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.envs.mdp import events  # 导入官方预置的事件函数库
 from isaaclab.managers import EventTermCfg as EventTerm
 # Curriculum所需
-from isaaclab.envs.mdp import curriculum  # 导入官方预置的课程学习逻辑
-from isaaclab.managers import CurriculumTermCfg as CurrTerm
+# 官方没有提供课程的库
 # ManageBased环境配置所需
 from isaaclab.envs import ManagerBasedRLEnvCfg
 
