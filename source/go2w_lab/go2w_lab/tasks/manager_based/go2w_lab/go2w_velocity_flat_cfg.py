@@ -308,12 +308,12 @@ class Go2W_VelocityFlatRewardsCfg:
         weight=-1.0,
     )
 
-    # (6) 违规触地惩罚：机身底盘、大腿磕碰地面时扣大分 (利用传感器实现防摔)
+    # (6) 违规触地惩罚：机身除轮子以外的部分磕碰地面时扣大分 (利用传感器实现防摔)
     undesired_contacts = RewTerm(
         func=rewards.undesired_contacts,
         weight=-1.0,
         params={
-            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=["base", ".*_thigh"]),    # 专门筛选出大腿和base基座（禁止触地）
+            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=["base", ".*_thigh", ".*_calf"]),
             "threshold": 1.0,
         },
     )
@@ -338,6 +338,21 @@ class Go2W_VelocityFlatRewardsCfg:
     dof_pos_limits = RewTerm(
         func=rewards.joint_pos_limits,
         weight=-1.0,
+    )
+
+    # -------------------------------------------------------------------------
+    # 4. 自定义rewards（在mdp目录中）
+    # -------------------------------------------------------------------------
+
+    # 机身高度惩罚项
+    base_height_l2 = RewTerm(
+        func=mdp.base_height_l2,
+        weight=-1.5,
+        params={
+            "target_height": 0.4,  # 机器人站立时的理想期望高度 (米)
+            "asset_cfg": SceneEntityCfg("robot"),
+            "sensor_cfg": SceneEntityCfg("height_scanner_base"),  # 机身高度传感器
+        },
     )
 
 #=================================
