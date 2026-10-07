@@ -43,7 +43,7 @@ class Go2W_VelocityRoughSceneCfg(Go2W_VelocityFlatSceneCfg):
     )
 
 #=================================
-# Curriculum设置（暂时不启用）
+# Curriculum设置
 #=================================
 @configclass
 class Go2W_VelocityRoughCurriculumCfg:
