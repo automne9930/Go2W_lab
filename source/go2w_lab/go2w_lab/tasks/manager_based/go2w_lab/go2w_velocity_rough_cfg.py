@@ -33,6 +33,12 @@ class Go2W_VelocityRoughSceneCfg(Go2W_VelocityFlatSceneCfg):
             dynamic_friction=1.0,               # 动摩擦力
             restitution=0.0,                    # 恢复系数 (0=完全吸震无弹力)
         ),
+        visual_material=sim_utils.PreviewSurfaceCfg(
+        # 0.25~0.35 之间（中暗灰，既不会死黑也不会晃眼）
+        diffuse_color=(0.3, 0.3, 0.3),
+        roughness=0.9,   # 几乎全哑光，不反射多余高光
+        metallic=0.0,
+        ),
         debug_vis=False,
     )
 
