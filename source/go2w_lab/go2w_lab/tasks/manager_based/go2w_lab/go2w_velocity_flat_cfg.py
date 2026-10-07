@@ -5,6 +5,7 @@
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg
+from isaaclab.terrains import TerrainImporterCfg
 # Command所需
 from isaaclab.envs.mdp import commands  # 导入官方预置的 Command 生成项实现
 from isaaclab.managers import CommandTermCfg as CmdTerm
@@ -25,8 +26,7 @@ from isaaclab.managers import TerminationTermCfg as DoneTerm
 # Event所需
 from isaaclab.envs.mdp import events  # 导入官方预置的事件函数库
 from isaaclab.managers import EventTermCfg as EventTerm
-# Curriculum所需
-# 官方没有提供课程的库
+
 # ManageBased环境配置所需
 from isaaclab.envs import ManagerBasedRLEnvCfg
 
@@ -47,10 +47,17 @@ from go2w_lab.assets import UNITREE_GO2W_CFG
 class Go2W_VelocityFlatSceneCfg(InteractiveSceneCfg):
     """Go2W 速度跟踪任务的平坦地面场景"""
 
-    # 地形设置
-    ground = AssetBaseCfg(
-        prim_path="/World/ground",
-        spawn=sim_utils.GroundPlaneCfg(size=(100.0, 100.0)),
+    # 地形设置：flat 与 rough 共用同一个 terrain 字段名，rough 只需覆盖它即可
+    terrain = TerrainImporterCfg(
+        prim_path="/World/ground",              # prim 路径不变，RayCaster 的 mesh_prim_paths 无需改动
+        terrain_type="plane",                   # 平地：直接生成一块无限大的平面
+        collision_group=-1,                     # 全局共享碰撞体，节约显存
+        physics_material=sim_utils.RigidBodyMaterialCfg(
+            static_friction=0.5,                # 静摩擦力
+            dynamic_friction=0.5,               # 动摩擦力
+            restitution=0.0,                    # 恢复系数 (0=完全吸震无弹力)
+        ),
+        debug_vis=False,
     )
 
     # 机器人设置
@@ -629,8 +636,8 @@ class Go2W_VelocityFlat_ManagerBasedEnv(ManagerBasedRLEnvCfg):
         # 物理引擎底层参数
         self.sim.dt = 0.005           # PhysX 物理仿真步长 (200 Hz 计算刚体与接触)
         self.sim.render_interval = self.decimation  # 渲染频率与策略决策周期对齐 (50 Hz 渲染)
-        # 全局物理材质取自地面：本任务是平地，场景里只有 ground，没有 terrain 项
-        self.sim.physics_material = self.scene.ground.spawn.physics_material
+        # 全局物理材质取自地形terrain：
+        self.sim.physics_material = self.scene.terrain.physics_material
         self.sim.physx.gpu_max_rigid_patch_count = 10 * 2**15            # 扩容 GPU 接触补丁显存池，防止复杂碰撞溢出
 
         # 传感器采样频率分流更新
