@@ -142,18 +142,21 @@ class Go2W_ObservationsCfg:
             func=mdp.base_ang_vel,    # mdp计算函数
             scale=0.2,    # 量纲缩放系数
             noise=Unoise(n_min=-0.2, n_max=0.2),    # 噪声注入（缩放前在角速度上叠加 [-0.2, 0.2] rad/s 的均匀白噪声）
+            clip=(-100.0, 100.0),
         )
 
         # (2) 重力投影向量 (来自 IMU 姿态解算，3维)
         projected_gravity = ObsTerm(
             func=mdp.projected_gravity,
             noise=Unoise(n_min=-0.05, n_max=0.05),
+            clip=(-100.0, 100.0),
         )
 
         # (3) 速度指令 (手柄/上位机目标速度: vx, vy, wz，3维)
         velocity_commands = ObsTerm(
             func=mdp.generated_commands,
             params={"command_name": "base_velocity"},   # 通过指令项的名字取回 (vx, vy, wz)
+            clip=(-100.0, 100.0),
         )
 
         # (4) 腿部关节相对位置 (12维: 髋、大腿、小腿)
@@ -162,6 +165,7 @@ class Go2W_ObservationsCfg:
             params={"asset_cfg": SceneEntityCfg("robot", joint_names=["^(?!.*_foot_joint).*"])},
             scale=1.0,
             noise=Unoise(n_min=-0.01, n_max=0.01),
+            clip=(-100.0, 100.0),
         )
 
         # (5) 腿部关节角速度 (12维)
@@ -170,6 +174,7 @@ class Go2W_ObservationsCfg:
             params={"asset_cfg": SceneEntityCfg("robot", joint_names=["^(?!.*_foot_joint).*"])},
             scale=0.05,
             noise=Unoise(n_min=-1.5, n_max=1.5),
+            clip=(-100.0, 100.0),
         )
 
         # (6) 轮子转速 (4维: 针对轮足的核心特征，轮子不能读位置，只读速度)
@@ -178,6 +183,7 @@ class Go2W_ObservationsCfg:
             params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_foot_joint"])},
             scale=0.05,
             noise=Unoise(n_min=-1.5, n_max=1.5),
+            clip=(-100.0, 100.0),
         )
 
         # (7) 动作历史缓存 (上一控制周期的动作输出，16维: 12腿 + 4轮)
@@ -195,23 +201,37 @@ class Go2W_ObservationsCfg:
         """供价值评估网络Critic使用-提供准确的状态价值评估"""
 
         # 包含 Policy 组的所有感知量（Critic 也需要掌握策略可见的状态）
-        base_ang_vel = ObsTerm(func=mdp.base_ang_vel, scale=0.2)
-        projected_gravity = ObsTerm(func=mdp.projected_gravity)
-        velocity_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "base_velocity"})
+        base_ang_vel = ObsTerm(
+            func=mdp.base_ang_vel, 
+            scale=0.2,
+            clip=(-100.0, 100.0),
+        )
+        projected_gravity = ObsTerm(
+            func=mdp.projected_gravity,
+            clip=(-100.0, 100.0),
+        )
+        velocity_commands = ObsTerm(
+            func=mdp.generated_commands, 
+            params={"command_name": "base_velocity"},
+            clip=(-100.0, 100.0),
+        )
         joint_pos_legs = ObsTerm(
             func=mdp.joint_pos_rel,
             params={"asset_cfg": SceneEntityCfg("robot", joint_names=["^(?!.*_foot_joint).*"])},
             scale=1.0,
+            clip=(-100.0, 100.0),
         )
         joint_vel_legs = ObsTerm(
             func=mdp.joint_vel_rel,
             params={"asset_cfg": SceneEntityCfg("robot", joint_names=["^(?!.*_foot_joint).*"])},
             scale=0.05,
+            clip=(-100.0, 100.0),
         )
         wheel_vel = ObsTerm(
             func=mdp.joint_vel_rel,
             params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_foot_joint"])},
             scale=0.05,
+            clip=(-100.0, 100.0),
         )
         last_action = ObsTerm(func=mdp.last_action)
 
@@ -222,6 +242,7 @@ class Go2W_ObservationsCfg:
         height_scan = ObsTerm(
             func=mdp.height_scan,
             params={"sensor_cfg": SceneEntityCfg("height_scanner")},
+            clip=(-1.0, 1.0),
         )
         
         # sensors里还有一个雷达+一个力传感器，不过不在Observation里加入，而是作为后续Reward打分使用

@@ -8,6 +8,7 @@
 from isaaclab.envs.mdp import *  # noqa: F401, F403
 
 from .rewards import *  # noqa: F401, F403
+from .curriculums import * # noqa: F401, F403
 
 
 # 导入官方 locomotion 任务内置的地形等级课程算子
