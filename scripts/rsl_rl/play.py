@@ -114,6 +114,12 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     env_cfg.seed = agent_cfg.seed
     env_cfg.sim.device = args_cli.device if args_cli.device is not None else env_cfg.sim.device
 
+    # disable curriculum during play
+    # the command range curriculum rewrites the velocity ranges to 10% of the configured ones at
+    # step 0, so playing a checkpoint would only ever show tiny velocity commands.
+    if hasattr(env_cfg, "curriculum"):
+        env_cfg.curriculum = None
+
     # specify directory for logging experiments
     log_root_path = os.path.join("logs", "rsl_rl", agent_cfg.experiment_name)
     log_root_path = os.path.abspath(log_root_path)
