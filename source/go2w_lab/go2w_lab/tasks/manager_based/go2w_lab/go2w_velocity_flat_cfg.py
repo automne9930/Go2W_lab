@@ -284,7 +284,7 @@ class Go2W_ActionsCfg:
         scale=0.25,
         # 是否基于机器人默认姿态进行增量叠加（True 表示输出的是相对默认姿态的偏差）
         use_default_offset=True,
-        clip=(-100.0, 100.0),
+        clip={".*": (-100.0, 100.0)}, 
     )
 
     # -------------------------------------------------------------------------
@@ -298,7 +298,7 @@ class Go2W_ActionsCfg:
         scale=10.0,
         # 轮子没有默认“默认角度”，直接控制目标转速，故不叠加默认偏置
         use_default_offset=False,
-        clip=(-100.0, 100.0),
+        clip={".*": (-100.0, 100.0)}, 
     )
 
 
@@ -533,14 +533,15 @@ class Go2W_TerminationsCfg:
     )
 
     # -------------------------------------------------------------------------
-    # 4. 走出边界终止 (Termination)
+    # 4. 从训练环境边界跌落终止 (Termination)
     # -------------------------------------------------------------------------
-    terrain_out_of_bounds = DoneTerm(
-        func=terminations.terrain_out_of_bounds,
-        # 假设边界是20*20 那么走出中心10m就会越界，这一项的作用就是给一个缓冲区3.0m，走到13m才算越界
-        params={"asset_cfg": SceneEntityCfg("robot"), "distance_buffer": 3.0},
-        # timeout设计，不会破坏正常的价值估计
-        time_out=True,
+    root_height_below_minimum = DoneTerm(
+        func=terminations.root_height_below_minimum,
+        params={
+            # 当机器狗掉落高度低于 -5.0 米（从训练环境边界跌落）时直接重置
+            # 需要注意的是，如果这一项太小，遇到往下的地形可能会出现问题（例如倒金字塔）所以最好将此值调大一些
+            "minimum_height": -5.0,
+        },
     )
 
 #=================================
