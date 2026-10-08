@@ -93,7 +93,6 @@ class Go2W_VelocityFlatSceneCfg(InteractiveSceneCfg):
         spawn=sim_utils.DomeLightCfg(color=(0.9, 0.9, 0.9), intensity=500.0),
     )
 
-
 #=================================
 # Command设置
 #=================================
@@ -301,7 +300,6 @@ class Go2W_ActionsCfg:
         clip={".*": (-100.0, 100.0)}, 
     )
 
-
 #=================================
 # Reward设置
 #=================================
@@ -343,7 +341,7 @@ class Go2W_VelocityFlatRewardsCfg:
         weight=-0.05,
     )
 
-    # (5) 机身姿态调平：惩罚非垂直方向的重力投影误差 (保持机身水平)
+    # (5) 机身姿态调平：惩罚非垂直方向的重力投影误差 (保持机身水平)（已被upward取代）
     flat_orientation_l2 = RewTerm(
         func=rewards.flat_orientation_l2,
         weight=-1.0,
@@ -354,7 +352,7 @@ class Go2W_VelocityFlatRewardsCfg:
         func=rewards.undesired_contacts,
         weight=-1.0,
         params={
-            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=["base", ".*_thigh", ".*_calf"]),
+            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=["^(?!.*_foot).*"]),
             "threshold": 1.0,
         },
     )
@@ -384,7 +382,7 @@ class Go2W_VelocityFlatRewardsCfg:
     # (9) 关节限位惩罚：惩罚关节角度接近机械极限 (防止打到硬件硬限位)
     dof_pos_limits = RewTerm(
         func=rewards.joint_pos_limits,
-        weight=-1.0,
+        weight=-5.0,
         params={
             "asset_cfg": SceneEntityCfg(
                 name="robot",
@@ -450,7 +448,7 @@ class Go2W_VelocityFlatRewardsCfg:
     # 引导机器人在接收到静止指令时恢复到预设的标准站立姿态
     stand_still_penalty= RewTerm(
         func=mdp.stand_still,
-        weight=-0.2,  # 惩罚偏离默认姿态，权重必须为负值（通常在 -0.1 ~ -1.0 之间）
+        weight=-2.0,  # 惩罚偏离默认姿态，权重必须为负值
         params={
             "command_name": "base_velocity",  # 对应 CommandManager 中的命令项名称
             "command_threshold": 0.06,        # 线速度与角速度综合模长阈值(m/s和rad/s)
@@ -465,7 +463,7 @@ class Go2W_VelocityFlatRewardsCfg:
     # 动静态结合约束关节姿态：行进时微弱约束保持步态美观，静止时强力约束归位标准站姿
     joint_position_penalty = RewTerm(
         func=mdp.joint_not_default,
-        weight=-0.1,  # 惩罚项权重设为负值（通常在 -0.05 ~ -0.5 之间）
+        weight=-1.0,  # 惩罚项权重设为负值
         params={
             "command_name": "base_velocity",  # 对应 CommandManager 中的命令项名称
             "stand_still_scale": 5.0,         # 静止时的放大倍率（静止惩罚力度变为 5 倍）
