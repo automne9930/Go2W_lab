@@ -26,8 +26,8 @@ class Go2W_VelocityRoughSceneCfg(Go2W_VelocityFlatSceneCfg):
         prim_path="/World/ground",              # USD 挂载路径
         terrain_type="generator",               # 程序化生成模式
         terrain_generator=ROUGH_TERRAINS_CFG,   # 使用官方预设的崎岖地形生成器
-        # max_init_terrain_level=2,               # 初始只在 0~2 级低难度地块出生（一共10级）
-        max_init_terrain_level=10,              # 如果开启play模式，可以直接全部接受以测试用
+        max_init_terrain_level=2,               # 初始只在 0~2 级低难度地块出生（一共0-9级）
+        # max_init_terrain_level=9,              # 如果开启play模式，可以直接全部接受以测试用
         collision_group=-1,                     # 全局共享碰撞体，节约显存
         physics_material=sim_utils.RigidBodyMaterialCfg(
             static_friction=1.0,                # 静摩擦力
