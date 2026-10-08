@@ -187,7 +187,10 @@ class Go2W_ObservationsCfg:
         )
 
         # (7) 动作历史缓存 (上一控制周期的动作输出，16维: 12腿 + 4轮)
-        last_action = ObsTerm(func=mdp.last_action)
+        last_action = ObsTerm(
+            func=mdp.last_action,
+            clip=(-100.0, 100.0),
+        )
 
         def __post_init__(self) -> None:
             self.enable_corruption = True   # 开启噪声注入（Sim2Real 域随机化）
@@ -233,10 +236,16 @@ class Go2W_ObservationsCfg:
             scale=0.05,
             clip=(-100.0, 100.0),
         )
-        last_action = ObsTerm(func=mdp.last_action)
+        last_action = ObsTerm(
+            func=mdp.last_action,
+            clip=(-100.0, 100.0),
+        )
 
         # 【特权项 A】：机身真实线速度 (真机无高频精准传感器，仿真中直接取物理引擎真值，3维)
-        base_lin_vel = ObsTerm(func=mdp.base_lin_vel)
+        base_lin_vel = ObsTerm(
+            func=mdp.base_lin_vel,
+            clip=(-100.0, 100.0),
+        )
 
         # 【特权项 B】：周围地形高程扫描图 (来自之前配置的 height_scanner 传感器，187维，在Flat任务中可以不使用)
         height_scan = ObsTerm(
@@ -275,6 +284,7 @@ class Go2W_ActionsCfg:
         scale=0.25,
         # 是否基于机器人默认姿态进行增量叠加（True 表示输出的是相对默认姿态的偏差）
         use_default_offset=True,
+        clip=(-100.0, 100.0),
     )
 
     # -------------------------------------------------------------------------
@@ -288,6 +298,7 @@ class Go2W_ActionsCfg:
         scale=10.0,
         # 轮子没有默认“默认角度”，直接控制目标转速，故不叠加默认偏置
         use_default_offset=False,
+        clip=(-100.0, 100.0),
     )
 
 
@@ -521,6 +532,17 @@ class Go2W_TerminationsCfg:
         },
     )
 
+    # -------------------------------------------------------------------------
+    # 4. 走出边界终止 (Termination)
+    # -------------------------------------------------------------------------
+    terrain_out_of_bounds = DoneTerm(
+        func=terminations.terrain_out_of_bounds,
+        # 假设边界是20*20 那么走出中心10m就会越界，这一项的作用就是给一个缓冲区3.0m，走到13m才算越界
+        params={"asset_cfg": SceneEntityCfg("robot"), "distance_buffer": 3.0},
+        # timeout设计，不会破坏正常的价值估计
+        time_out=True,
+    )
+
 #=================================
 # Event设置
 #=================================
@@ -540,6 +562,7 @@ class Go2W_EventCfg:
             "asset_cfg": SceneEntityCfg("robot", body_names="base"),
             "mass_distribution_params": (-1.0, 3.0),  # 允许机身质量浮动 -1kg 到 +3kg
             "operation": "add",
+            "recompute_inertia": True,  # 质量随机化-惯量重算
         },
     )
 
