@@ -53,29 +53,6 @@ class Go2W_VelocityRoughCurriculumCfg:
     # 1. 地形难度课程：根据移动位移动态升降级地块难度
     terrain_levels = CurrTerm(func=mdp.terrain_levels_vel)
 
-    # 2. 指令课程
-    # 注册线速度课程项
-    lin_vel_cmd = CurrTerm(
-        func=mdp.command_levels_lin_vel,
-        params={
-            # 必须与 RewardsCfg 中配置的速度跟踪奖励项名称一致
-            "reward_term_name": "track_lin_vel_xy_exp",
-            # 初始速度范围占最终速度范围的比例 [min_ratio, max_ratio]
-            # 例如最终范围是 [-2.0, 2.0]，则初始范围被压缩至 [-0.2, 0.2]
-            "range_multiplier": (0.1, 1.0),
-        },
-    )
-
-    # 偏航角速度跟踪课程
-    ang_vel_cmd = CurrTerm(
-        func=mdp.command_levels_ang_vel,
-        params={
-            # 必须与 RewardsCfg 中角速度跟踪奖励项名称一致
-            "reward_term_name": "track_ang_vel_z_exp",
-            "range_multiplier": (0.1, 1.0),
-        },
-    )
-
 #=================================
 # 总环境设置（继承平坦地形的基础上进行修改）
 #=================================
@@ -83,7 +60,7 @@ class Go2W_VelocityRoughCurriculumCfg:
 class Go2W_VelocityRough_ManagerBasedEnv(Go2W_VelocityFlat_ManagerBasedEnv):
     """复杂地形运动速度跟踪强化学习环境总配置"""
     scene: Go2W_VelocityRoughSceneCfg = Go2W_VelocityRoughSceneCfg(num_envs=4096, env_spacing=8.0)
-    curriculum: Go2W_VelocityRoughCurriculumCfg = Go2W_VelocityRoughCurriculumCfg()       # 课程学习 (地形与指令难度动态递进)
+    curriculum: Go2W_VelocityRoughCurriculumCfg = Go2W_VelocityRoughCurriculumCfg()       # 课程学习 (地形难度动态递进)
 
     def __post_init__(self):
         # 运行父类的post_init

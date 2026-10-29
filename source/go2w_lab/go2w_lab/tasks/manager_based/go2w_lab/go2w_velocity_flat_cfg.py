@@ -41,6 +41,22 @@ from go2w_lab.assets import UNITREE_GO2W_CFG
 
 
 #=================================
+# 关节顺序基准（唯一真值）
+#=================================
+# 真机部署侧 isaaclab_joint_names 的顺序：FR -> FL -> RR -> RL，腿部在前、轮子在后。
+# 观测、动作、last_action 全部引用这里，保证仿真与真机的索引完全一致。
+LEG_JOINT_NAMES = [
+    "FR_hip_joint", "FR_thigh_joint", "FR_calf_joint",
+    "FL_hip_joint", "FL_thigh_joint", "FL_calf_joint",
+    "RR_hip_joint", "RR_thigh_joint", "RR_calf_joint",
+    "RL_hip_joint", "RL_thigh_joint", "RL_calf_joint",
+]
+WHEEL_JOINT_NAMES = [
+    "FR_foot_joint", "FL_foot_joint", "RR_foot_joint", "RL_foot_joint",
+]
+
+
+#=================================
 # Scene设置
 #=================================
 @configclass
@@ -158,34 +174,34 @@ class Go2W_ObservationsCfg:
             clip=(-100.0, 100.0),
         )
 
-        # (4) 腿部关节相对位置 (12维: 髋、大腿、小腿)
+        # (4) 腿部关节相对位置 (12维: 髋、大腿、小腿，顺序 FR -> FL -> RR -> RL)
         joint_pos_legs = ObsTerm(
             func=mdp.joint_pos_rel,
-            params={"asset_cfg": SceneEntityCfg("robot", joint_names=["^(?!.*_foot_joint).*"])},
+            params={"asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINT_NAMES, preserve_order=True)},
             scale=1.0,
             noise=Unoise(n_min=-0.01, n_max=0.01),
             clip=(-100.0, 100.0),
         )
 
-        # (5) 腿部关节角速度 (12维)
+        # (5) 腿部关节角速度 (12维: 顺序与 joint_pos_legs 一致)
         joint_vel_legs = ObsTerm(
             func=mdp.joint_vel_rel,
-            params={"asset_cfg": SceneEntityCfg("robot", joint_names=["^(?!.*_foot_joint).*"])},
+            params={"asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINT_NAMES, preserve_order=True)},
             scale=0.05,
             noise=Unoise(n_min=-1.5, n_max=1.5),
             clip=(-100.0, 100.0),
         )
 
-        # (6) 轮子转速 (4维: 针对轮足的核心特征，轮子不能读位置，只读速度)
+        # (6) 轮子转速 (4维: 顺序 FR -> FL -> RR -> RL，与动作后 4 维对齐)
         wheel_vel = ObsTerm(
             func=mdp.joint_vel_rel,
-            params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_foot_joint"])},
+            params={"asset_cfg": SceneEntityCfg("robot", joint_names=WHEEL_JOINT_NAMES, preserve_order=True)},
             scale=0.05,
             noise=Unoise(n_min=-1.5, n_max=1.5),
             clip=(-100.0, 100.0),
         )
 
-        # (7) 动作历史缓存 (上一控制周期的动作输出，16维: 12腿 + 4轮)
+        # (7) 动作历史缓存 (上一控制周期的动作输出，16维: 前12维腿 FR->FL->RR->RL，后4维轮 FR->FL->RR->RL)
         last_action = ObsTerm(
             func=mdp.last_action,
             clip=(-100.0, 100.0),
@@ -219,19 +235,19 @@ class Go2W_ObservationsCfg:
         )
         joint_pos_legs = ObsTerm(
             func=mdp.joint_pos_rel,
-            params={"asset_cfg": SceneEntityCfg("robot", joint_names=["^(?!.*_foot_joint).*"])},
+            params={"asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINT_NAMES, preserve_order=True)},
             scale=1.0,
             clip=(-100.0, 100.0),
         )
         joint_vel_legs = ObsTerm(
             func=mdp.joint_vel_rel,
-            params={"asset_cfg": SceneEntityCfg("robot", joint_names=["^(?!.*_foot_joint).*"])},
+            params={"asset_cfg": SceneEntityCfg("robot", joint_names=LEG_JOINT_NAMES, preserve_order=True)},
             scale=0.05,
             clip=(-100.0, 100.0),
         )
         wheel_vel = ObsTerm(
             func=mdp.joint_vel_rel,
-            params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_foot_joint"])},
+            params={"asset_cfg": SceneEntityCfg("robot", joint_names=WHEEL_JOINT_NAMES, preserve_order=True)},
             scale=0.05,
             clip=(-100.0, 100.0),
         )
@@ -277,13 +293,15 @@ class Go2W_ActionsCfg:
     # -------------------------------------------------------------------------
     joint_pos = actions.JointPositionActionCfg(
         asset_name="robot",
-        # 通过正则过滤出 12 个腿部关节（排除 4 个轮子关节）
-        joint_names=["^(?!.*_foot_joint).*"],
+        # 12 个腿部关节：顺序 FR -> FL -> RR -> RL
+        joint_names=LEG_JOINT_NAMES,
+        # 强制使底层 joint_id 严格按照上面的列表顺序排列
+        preserve_order=True,
         # 动作缩放系数：14.3 度幅度
         scale=0.25,
         # 是否基于机器人默认姿态进行增量叠加（True 表示输出的是相对默认姿态的偏差）
         use_default_offset=True,
-        clip={".*": (-100.0, 100.0)}, 
+        clip={".*": (-100.0, 100.0)},
     )
 
     # -------------------------------------------------------------------------
@@ -292,7 +310,10 @@ class Go2W_ActionsCfg:
     joint_vel = actions.JointVelocityActionCfg(
         asset_name="robot",
         # 通过正则精准锁定 4 个轮子连续旋转关节
-        joint_names=[".*_foot_joint"],
+        # 4 个轮子关节：顺序 FR -> FL -> RR -> RL，接在 12 维腿部动作之后
+        joint_names=WHEEL_JOINT_NAMES,
+        # 强制使底层 joint_id 严格按照上面的列表顺序排列
+        preserve_order=True,
         # 动作缩放系数：满速10.0 rad/s
         scale=10.0,
         # 轮子没有默认“默认角度”，直接控制目标转速，故不叠加默认偏置
