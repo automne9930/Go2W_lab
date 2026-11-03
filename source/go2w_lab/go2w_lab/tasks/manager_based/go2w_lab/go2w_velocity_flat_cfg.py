@@ -127,6 +127,9 @@ class Go2W_CommandsCfg:
         # 航向角度控制设置
         heading_command = True,     # True表示机器人随机下发的是yaw角度指令，False表示下发yaw角速度
         heading_control_stiffness=0.5,    # yaw角度到yaw角速度的P控制器，角度的底层还是通过速度控制
+        # 静止环境比例：每次重采样时约有 10% 的环境被强制保持绝对零指令（整回合静止）
+        # 作用：保证批次中始终存在静止样本，激活 feet_stand_well、stand_still_penalty 等静止项
+        rel_standing_envs = 0.1,
         # 速度箭头显示
         debug_vis=True,
         # 具体的采样物理范围字典
@@ -494,6 +497,21 @@ class Go2W_VelocityFlatRewardsCfg:
                 name="robot",
                 # 轮足必须排除连续旋转的轮子；普通足式机器人覆盖腿部各主动关节
                 joint_names=[".*_hip_joint", ".*_thigh_joint", ".*_calf_joint"],
+            ),
+        },
+    )
+
+    # 静止时惩罚四个轮子空转：四轮恒着地时约束轮速
+    wheel_vel_penalty = RewTerm(
+        func=mdp.wheel_vel_penalty,
+        weight=-0.01,  # 惩罚项
+        params={
+            "command_name": "base_velocity",  # 对应 CommandManager 中的命令项名称
+            "velocity_threshold": 0.1,        # 机身平移线速度静止判定阈值 (m/s)
+            "command_threshold": 0.06,        # 指令模长静止判定阈值
+            "asset_cfg": SceneEntityCfg(
+                name="robot",
+                joint_names=WHEEL_JOINT_NAMES,  # 仅针对四个轮子关节
             ),
         },
     )

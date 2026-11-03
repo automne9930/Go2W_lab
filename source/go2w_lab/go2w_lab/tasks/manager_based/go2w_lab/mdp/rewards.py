@@ -119,6 +119,39 @@ def joint_not_default(
     return reward
 
 # =========================================
+# wheel_vel_penalty：静止状态下惩罚四个轮子的空转速度
+# =========================================
+def wheel_vel_penalty(
+    env: ManagerBasedRLEnv,
+    command_name: str,
+    command_threshold: float = 0.06,
+    velocity_threshold: float = 0.1,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """Penalize wheel joint velocities when the command is near zero and the base is stationary."""
+    # 1. 提取机器人铰接资产对象 (Articulation)
+    asset: Articulation = env.scene[asset_cfg.name]
+
+    # 2. 提取当前指令模长与机身底盘实际水平线速度模长
+    cmd = torch.linalg.norm(env.command_manager.get_command(command_name), dim=1)
+    body_vel = torch.linalg.norm(asset.data.root_lin_vel_b[:, :2], dim=1)
+
+    # 3. 计算四个轮子的绝对转速之和: sum(|omega_wheel|)
+    #    四轮恒着地，接触传感器无法区分轮子是否“该转”，故直接对转速本身施加惩罚
+    wheel_vel = torch.sum(torch.abs(asset.data.joint_vel[:, asset_cfg.joint_ids]), dim=1)
+
+    # 4. 门控：仅在既无指令又几乎无位移时（真正静止）激活惩罚，行进/移动时不受影响
+    reward = torch.where(
+        torch.logical_or(cmd > command_threshold, body_vel > velocity_threshold),
+        torch.zeros_like(wheel_vel),
+        wheel_vel,
+    )
+
+    # 5. 倒地姿态衰减保护
+    reward *= torch.clamp(-env.scene["robot"].data.projected_gravity_b[:, 2], 0, 0.7) / 0.7
+    return reward
+
+# =========================================
 # joint_mirror：惩罚左右对称关节的角度偏差，引导步态对称性
 # =========================================
 def joint_mirror(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg, mirror_joints: list[list[str]]) -> torch.Tensor:
