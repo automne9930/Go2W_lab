@@ -46,6 +46,24 @@ def feet_stand_well(
     return reward
 
 # =========================================
+# upward：奖励机身正立，越接近正立分越高
+# =========================================
+# 约定：本项为【正奖励】，权重取正值，输出越小说明姿态越差（倒立时为 0）
+# 取值：正立 (g_z=-1) -> 4.0；侧躺 (g_z=0) -> 1.0；倒立 (g_z=+1) -> 0.0
+def upward(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+    """Reward the base being upright, using (1 - g_z)^2 kernel."""
+    # 1. 提取机器人铰接资产对象 (Articulation)
+    asset: Articulation = env.scene[asset_cfg.name]
+
+    # 2. 取机身坐标系下的重力投影 Z 分量 (世界重力在 base 系下的单位向量)
+    g_z = asset.data.projected_gravity_b[:, 2]
+
+    # 3. 用 (1 - g_z)^2 构造“直立程度”标量：倒立点为零、四阶平坦，不会形成陷阱
+    reward = torch.square(1.0 - g_z)
+
+    return reward
+
+# =========================================
 # joint_power：计算力矩与角速度乘积绝对值，惩罚机械功耗
 # =========================================
 def joint_power(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:

@@ -122,8 +122,8 @@ class Go2W_CommandsCfg:
     base_velocity = commands.UniformVelocityCommandCfg(
         # 绑定的目标资产实体（指示该速度指令以哪个刚体的局部坐标系为基准）
         asset_name="robot",
-        # 重采样周期范围：每隔 10.0 到 10.0 秒（即固定 10 秒）为机器人更换一次新指令
-        resampling_time_range=(10.0, 10.0),
+        # 重采样周期范围：每隔 20s 换一次指令
+        resampling_time_range=(20.0, 20.0),
         # 航向角度控制设置
         heading_command = True,     # True表示机器人随机下发的是yaw角度指令，False表示下发yaw角速度
         heading_control_stiffness=0.5,    # yaw角度到yaw角速度的P控制器，角度的底层还是通过速度控制
@@ -365,10 +365,13 @@ class Go2W_VelocityFlatRewardsCfg:
         weight=-0.05,
     )
 
-    # (5) 机身姿态调平：惩罚非垂直方向的重力投影误差 (保持机身水平)（已被upward取代）
-    flat_orientation_l2 = RewTerm(
-        func=rewards.flat_orientation_l2,
-        weight=-1.0,
+    # (5) 机身姿态调平：奖励机身朝向天空的直立程度 (替代官方 flat_orientation_l2)
+    upward = RewTerm(
+        func=mdp.upward,
+        weight=0.1,  # 正奖励项，权重取正值 
+        params={
+            "asset_cfg": SceneEntityCfg("robot"),
+        },
     )
 
     # (6) 违规触地惩罚：机身除轮子以外的部分磕碰地面时扣大分 (利用传感器实现防摔)
