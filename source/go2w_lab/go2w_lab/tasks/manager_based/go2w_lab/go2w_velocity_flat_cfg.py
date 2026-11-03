@@ -490,7 +490,7 @@ class Go2W_VelocityFlatRewardsCfg:
     # 动静态结合约束关节姿态：行进时微弱约束保持步态美观，静止时强力约束归位标准站姿
     joint_position_penalty = RewTerm(
         func=mdp.joint_not_default,
-        weight=-1.0,  # 惩罚项权重设为负值
+        weight=-0.25,  # 惩罚项权重设为负值
         params={
             "command_name": "base_velocity",  # 对应 CommandManager 中的命令项名称
             "stand_still_scale": 5.0,         # 静止时的放大倍率（静止惩罚力度变为 5 倍）
