@@ -383,17 +383,28 @@ class Go2W_VelocityFlatRewardsCfg:
         },
     )
 
+    # (7) 足端力惩罚：超出阈值的足端接触力按超出量线性扣分
+    # 设定 100N 阈值
+    wheel_contact_forces = RewTerm(
+        func=rewards.contact_forces,
+        weight=-1.5e-4,
+        params={
+            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=[".*_foot"]),
+            "threshold": 100.0,
+        },
+    )
+
     # -------------------------------------------------------------------------
     # 3. 硬件寿命与平滑度正则化 (Regularization & Safety) - 负权重惩罚
     # -------------------------------------------------------------------------
 
-    # (7) 动作平滑惩罚：惩罚相邻控制步之间的动作跳变 (抑制电机高频抖动，防止真机炸机)
+    # (8) 动作平滑惩罚：惩罚相邻控制步之间的动作跳变 (抑制电机高频抖动，防止真机炸机)
     action_rate_l2 = RewTerm(
         func=rewards.action_rate_l2,
         weight=-0.01,
     )
 
-    # (8) 电机扭矩惩罚：惩罚过大的关节输出力矩 (降低能耗与电机发热)
+    # (9) 电机扭矩惩罚：惩罚过大的关节输出力矩 (降低能耗与电机发热)
     dof_torques_l2 = RewTerm(
         func=rewards.joint_torques_l2,
         weight=-2.5e-5,
@@ -405,7 +416,7 @@ class Go2W_VelocityFlatRewardsCfg:
         },
     )
 
-    # (9) 关节限位惩罚：惩罚关节角度接近机械极限 (防止打到硬件硬限位)
+    # (10) 关节限位惩罚：惩罚关节角度接近机械极限 (防止打到硬件硬限位)
     dof_pos_limits = RewTerm(
         func=rewards.joint_pos_limits,
         weight=-5.0,
@@ -417,7 +428,7 @@ class Go2W_VelocityFlatRewardsCfg:
         },
     )
 
-    # (10) 关节角加速度惩罚 
+    # (11) 关节角加速度惩罚
     joint_acc_l2 = RewTerm(
         func=rewards.joint_acc_l2,
         weight=-2.5e-7,  # 腿部对加速度敏感，惩罚较强
@@ -429,7 +440,7 @@ class Go2W_VelocityFlatRewardsCfg:
         },
     )
 
-    # (11) 轮角加速度惩罚 
+    # (12) 轮角加速度惩罚
     wheel_acc_l2 = RewTerm(
         func=rewards.joint_acc_l2,
         weight=-2.5e-9,  # 比腿部权重小 2~3 个数量级
