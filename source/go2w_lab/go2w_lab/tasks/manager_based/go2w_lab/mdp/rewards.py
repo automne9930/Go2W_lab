@@ -143,24 +143,21 @@ def wheel_vel_penalty(
     env: ManagerBasedRLEnv,
     command_name: str,
     command_threshold: float = 0.06,
-    velocity_threshold: float = 0.1,
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ) -> torch.Tensor:
-    """Penalize wheel joint velocities when the command is near zero and the base is stationary."""
+    """Penalize wheel joint velocities when the command is near zero."""
     # 1. 提取机器人铰接资产对象 (Articulation)
     asset: Articulation = env.scene[asset_cfg.name]
 
-    # 2. 提取当前指令模长与机身底盘实际水平线速度模长
+    # 2. 提取当前指令模长
     cmd = torch.linalg.norm(env.command_manager.get_command(command_name), dim=1)
-    body_vel = torch.linalg.norm(asset.data.root_lin_vel_b[:, :2], dim=1)
 
     # 3. 计算四个轮子的绝对转速之和: sum(|omega_wheel|)
-    #    四轮恒着地，接触传感器无法区分轮子是否“该转”，故直接对转速本身施加惩罚
     wheel_vel = torch.sum(torch.abs(asset.data.joint_vel[:, asset_cfg.joint_ids]), dim=1)
 
-    # 4. 门控：仅在既无指令又几乎无位移时（真正静止）激活惩罚，行进/移动时不受影响
+    # 4. 门控：仅在指令模长接近零时激活惩罚
     reward = torch.where(
-        torch.logical_or(cmd > command_threshold, body_vel > velocity_threshold),
+        cmd > command_threshold,
         torch.zeros_like(wheel_vel),
         wheel_vel,
     )

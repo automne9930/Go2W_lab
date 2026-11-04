@@ -125,18 +125,17 @@ class Go2W_CommandsCfg:
         # 重采样周期范围：每隔 20s 换一次指令
         resampling_time_range=(20.0, 20.0),
         # 航向角度控制设置
-        heading_command = True,     # True表示机器人随机下发的是yaw角度指令，False表示下发yaw角速度
+        heading_command = False,    # True表示机器人随机下发的是yaw角度指令，False表示下发yaw角速度
         heading_control_stiffness=0.5,    # yaw角度到yaw角速度的P控制器，角度的底层还是通过速度控制
         # 静止环境比例：每次重采样时约有 10% 的环境被强制保持绝对零指令（整回合静止）
-        # 作用：保证批次中始终存在静止样本，激活 feet_stand_well、stand_still_penalty 等静止项
         rel_standing_envs = 0.1,
         # 速度箭头显示
         debug_vis=True,
         # 具体的采样物理范围字典
         ranges=commands.UniformVelocityCommandCfg.Ranges(
-            lin_vel_x=(-1.5, 1.5),  # 期望前进/后退速度范围 (m/s)
-            lin_vel_y=(-0.5, 0.5),  # 期望侧向平移速度范围 (m/s，轮足通常横向受限，范围略小)
-            ang_vel_z=(-1.0, 1.0),  # 期望原地自转角速度范围 (rad/s)，如果heading_command = True，则本项作为P控制器输出后的限幅存在
+            lin_vel_x=(-2.5, 2.5),  # 期望前进/后退速度范围 (m/s)
+            lin_vel_y=(-1.0, 1.0),  # 期望侧向平移速度范围 (m/s，轮足通常横向受限，范围略小)
+            ang_vel_z=(-2.0, 2.0),  # 期望原地自转角速度范围 (rad/s)，如果heading_command = True，则本项作为P控制器输出后的限幅存在
             heading=(-3.14, 3.14),  # 期望航向朝向角范围 (rad)
         ),
     )
@@ -504,14 +503,13 @@ class Go2W_VelocityFlatRewardsCfg:
         },
     )
 
-    # 静止时惩罚四个轮子空转：四轮恒着地时约束轮速
+    # 静止时惩罚四个轮子空转：仅由指令模长判定静止，约束轮速
     wheel_vel_penalty = RewTerm(
         func=mdp.wheel_vel_penalty,
-        weight=-0.01,  # 惩罚项
+        weight=-0.05,  # 惩罚项
         params={
             "command_name": "base_velocity",  # 对应 CommandManager 中的命令项名称
-            "velocity_threshold": 0.1,        # 机身平移线速度静止判定阈值 (m/s)
-            "command_threshold": 0.06,        # 指令模长静止判定阈值
+            "command_threshold": 0.06,        # 指令线+角速度模长静止判定阈值
             "asset_cfg": SceneEntityCfg(
                 name="robot",
                 joint_names=WHEEL_JOINT_NAMES,  # 仅针对四个轮子关节
@@ -527,8 +525,8 @@ class Go2W_VelocityFlatRewardsCfg:
             "asset_cfg": SceneEntityCfg("robot"),
             # 传入成对的左右镜像关节名称（斜角对应）
             "mirror_joints": [
-            ["FR_(hip|thigh|calf).*", "RL_(hip|thigh|calf).*"],
-            ["FL_(hip|thigh|calf).*", "RR_(hip|thigh|calf).*"],
+            ["FR_(thigh|calf).*", "RL_(thigh|calf).*"],
+            ["FL_(thigh|calf).*", "RR_(thigh|calf).*"],
             ]
         },
     )
@@ -622,6 +620,8 @@ class Go2W_EventCfg:
             "pose_range": {
                 "x": (-0.5, 0.5),
                 "y": (-0.5, 0.5),
+                "roll": (-0.3, 0.3),   # 出生时随机pitch、roll（约17.2度）
+                "pitch": (-0.3, 0.3),
                 "yaw": (-3.14, 3.14),  # 出生时随机朝向
             },
             "velocity_range": {
