@@ -119,7 +119,7 @@ class Go2W_CommandsCfg:
     # -------------------------------------------------------------------------
     # 机身底盘速度跟踪指令：模拟手柄遥控机器人的 (vx, vy, wz)
     # -------------------------------------------------------------------------
-    base_velocity = mdp.Go2W_UniformVelocityCommandCfg(
+    base_velocity = mdp.Update_UniformVelocityCommandCfg(
         # 绑定的目标资产实体（指示该速度指令以哪个刚体的局部坐标系为基准）
         asset_name="robot",
         # 重采样周期范围：每隔 20s 换一次指令

@@ -27,7 +27,7 @@ from isaaclab.envs.mdp.commands import UniformVelocityCommand, UniformVelocityCo
 from isaaclab.utils import configclass
 
 
-class Go2W_UniformVelocityCommand(UniformVelocityCommand):
+class Update_UniformVelocityCommand(UniformVelocityCommand):
     """与官方实现完全一致，只把 metrics 的分母改成“本回合实际累计控制步数”。"""
 
     def __init__(self, cfg: UniformVelocityCommandCfg, env):
@@ -66,7 +66,7 @@ class Go2W_UniformVelocityCommand(UniformVelocityCommand):
 
 
 @configclass
-class Go2W_UniformVelocityCommandCfg(UniformVelocityCommandCfg):
+class Update_UniformVelocityCommandCfg(UniformVelocityCommandCfg):
     """使用修正版 metrics 的速度指令配置。"""
 
-    class_type: type = Go2W_UniformVelocityCommand
+    class_type: type = Update_UniformVelocityCommand
