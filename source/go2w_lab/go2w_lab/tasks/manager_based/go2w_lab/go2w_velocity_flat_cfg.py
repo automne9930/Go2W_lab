@@ -122,8 +122,8 @@ class Go2W_CommandsCfg:
     base_velocity = mdp.Update_UniformVelocityCommandCfg(
         # 绑定的目标资产实体（指示该速度指令以哪个刚体的局部坐标系为基准）
         asset_name="robot",
-        # 重采样周期范围：每隔 20s 换一次指令
-        resampling_time_range=(20.0, 20.0),
+        # 重采样周期范围：每隔 8-10s 换一次指令
+        resampling_time_range=(8.0, 10.0),
         # 航向角度控制设置
         heading_command = False,    # True表示机器人随机下发的是yaw角度指令，False表示下发yaw角速度
         heading_control_stiffness=0.5,    # yaw角度到yaw角速度的P控制器，角度的底层还是通过速度控制
