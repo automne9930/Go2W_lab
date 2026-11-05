@@ -125,7 +125,7 @@ class Go2W_CommandsCfg:
         # 重采样周期范围：每隔 8-10s 换一次指令
         resampling_time_range=(8.0, 10.0),
         # 航向角度控制设置
-        heading_command = False,    # True表示机器人随机下发的是yaw角度指令，False表示下发yaw角速度
+        heading_command = True,    # True表示机器人随机下发的是yaw角度指令，False表示下发yaw角速度
         heading_control_stiffness=0.5,    # yaw角度到yaw角速度的P控制器，角度的底层还是通过速度控制
         # 静止环境比例：每次重采样时约有 10% 的环境被强制保持绝对零指令（整回合静止）
         rel_standing_envs = 0.1,
@@ -531,13 +531,13 @@ class Go2W_VelocityFlatRewardsCfg:
     # 惩罚左右镜像关节的非对称开合，促进直行或站立时机身对称性
     joint_mirror_penalty = RewTerm(
         func=mdp.joint_mirror,
-        weight=-0.05,  # 惩罚项，权重设为负值（通常在 -0.01 ~ -0.1 之间）
+        weight=-0.1,  # 惩罚项，权重设为负值（通常在 -0.01 ~ -0.1 之间）
         params={
             "asset_cfg": SceneEntityCfg("robot"),
             # 传入成对的左右镜像关节名称（斜角对应）
             "mirror_joints": [
-            ["FR_(thigh|calf).*", "RL_(thigh|calf).*"],
-            ["FL_(thigh|calf).*", "RR_(thigh|calf).*"],
+            ["FR_(hip|thigh|calf).*", "RL_(hip|thigh|calf).*"],
+            ["FL_(hip|thigh|calf).*", "RR_(hip|thigh|calf).*"],
             ]
         },
     )
@@ -631,8 +631,6 @@ class Go2W_EventCfg:
             "pose_range": {
                 "x": (-0.5, 0.5),
                 "y": (-0.5, 0.5),
-                "roll": (-0.3, 0.3),   # 出生时随机pitch、roll（约17.2度）
-                "pitch": (-0.3, 0.3),
                 "yaw": (-3.14, 3.14),  # 出生时随机朝向
             },
             "velocity_range": {
