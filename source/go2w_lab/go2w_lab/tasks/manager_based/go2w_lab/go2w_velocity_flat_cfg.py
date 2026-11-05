@@ -122,8 +122,8 @@ class Go2W_CommandsCfg:
     base_velocity = mdp.Update_UniformVelocityCommandCfg(
         # 绑定的目标资产实体（指示该速度指令以哪个刚体的局部坐标系为基准）
         asset_name="robot",
-        # 重采样周期范围：每隔 8-10s 换一次指令
-        resampling_time_range=(8.0, 10.0),
+        # 重采样周期范围：每隔 20s 换一次指令
+        resampling_time_range=(20.0, 20.0),
         # 航向角度控制设置
         heading_command = True,    # True表示机器人随机下发的是yaw角度指令，False表示下发yaw角速度
         heading_control_stiffness=0.5,    # yaw角度到yaw角速度的P控制器，角度的底层还是通过速度控制
@@ -133,7 +133,7 @@ class Go2W_CommandsCfg:
         debug_vis=True,
         # 具体的采样物理范围字典
         ranges=commands.UniformVelocityCommandCfg.Ranges(
-            lin_vel_x=(-2.0, 2.0),  # 期望前进/后退速度范围 (m/s)
+            lin_vel_x=(-1.5, 1.5),  # 期望前进/后退速度范围 (m/s)
             lin_vel_y=(-1.0, 1.0),  # 期望侧向平移速度范围 (m/s，轮足通常横向受限，范围略小)
             ang_vel_z=(-1.0, 1.0),  # 期望原地自转角速度范围 (rad/s)，如果heading_command = True，则本项作为P控制器输出后的限幅存在
             heading=(-3.14, 3.14),  # 期望航向朝向角范围 (rad)
@@ -517,7 +517,7 @@ class Go2W_VelocityFlatRewardsCfg:
     # 静止时惩罚四个轮子空转：仅由指令模长判定静止，约束轮速
     wheel_vel_penalty = RewTerm(
         func=mdp.wheel_vel_penalty,
-        weight=-0.05,  # 惩罚项
+        weight=-0.01,  # 惩罚项
         params={
             "command_name": "base_velocity",  # 对应 CommandManager 中的命令项名称
             "command_threshold": 0.06,        # 指令线+角速度模长静止判定阈值
@@ -531,7 +531,7 @@ class Go2W_VelocityFlatRewardsCfg:
     # 惩罚左右镜像关节的非对称开合，促进直行或站立时机身对称性
     joint_mirror_penalty = RewTerm(
         func=mdp.joint_mirror,
-        weight=-0.1,  # 惩罚项，权重设为负值（通常在 -0.01 ~ -0.1 之间）
+        weight=-0.05,  # 惩罚项，权重设为负值（通常在 -0.01 ~ -0.1 之间）
         params={
             "asset_cfg": SceneEntityCfg("robot"),
             # 传入成对的左右镜像关节名称（斜角对应）
