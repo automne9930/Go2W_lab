@@ -133,9 +133,9 @@ class Go2W_CommandsCfg:
         debug_vis=True,
         # 具体的采样物理范围字典
         ranges=commands.UniformVelocityCommandCfg.Ranges(
-            lin_vel_x=(-2.5, 2.5),  # 期望前进/后退速度范围 (m/s)
+            lin_vel_x=(-2.0, 2.0),  # 期望前进/后退速度范围 (m/s)
             lin_vel_y=(-1.0, 1.0),  # 期望侧向平移速度范围 (m/s，轮足通常横向受限，范围略小)
-            ang_vel_z=(-2.0, 2.0),  # 期望原地自转角速度范围 (rad/s)，如果heading_command = True，则本项作为P控制器输出后的限幅存在
+            ang_vel_z=(-1.0, 1.0),  # 期望原地自转角速度范围 (rad/s)，如果heading_command = True，则本项作为P控制器输出后的限幅存在
             heading=(-3.14, 3.14),  # 期望航向朝向角范围 (rad)
         ),
     )
