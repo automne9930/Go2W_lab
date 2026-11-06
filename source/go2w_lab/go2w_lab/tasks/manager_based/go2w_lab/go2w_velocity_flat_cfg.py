@@ -122,8 +122,8 @@ class Go2W_CommandsCfg:
     base_velocity = mdp.Update_UniformVelocityCommandCfg(
         # 绑定的目标资产实体（指示该速度指令以哪个刚体的局部坐标系为基准）
         asset_name="robot",
-        # 重采样周期范围：每隔 20s 换一次指令
-        resampling_time_range=(20.0, 20.0),
+        # 重采样周期范围：每隔 10s 换一次指令
+        resampling_time_range=(10.0, 10.0),
         # 航向角度控制设置
         heading_command = True,    # True表示机器人随机下发的是yaw角度指令，False表示下发yaw角速度
         heading_control_stiffness=0.5,    # yaw角度到yaw角速度的P控制器，角度的底层还是通过速度控制
@@ -367,7 +367,7 @@ class Go2W_VelocityFlatRewardsCfg:
     # (5) 机身姿态调平：奖励机身朝向天空的直立程度 (替代官方 flat_orientation_l2)
     upward = RewTerm(
         func=mdp.upward,
-        weight=0.1,  # 正奖励项，权重取正值 
+        weight=1.0,  # 正奖励项，权重取正值 
         params={
             "asset_cfg": SceneEntityCfg("robot"),
         },
@@ -500,7 +500,7 @@ class Go2W_VelocityFlatRewardsCfg:
     # 动静态结合约束关节姿态：行进时微弱约束保持步态美观，静止时强力约束归位标准站姿
     joint_position_penalty = RewTerm(
         func=mdp.joint_not_default,
-        weight=-0.25,  # 惩罚项权重设为负值
+        weight=-1.0,  # 惩罚项权重设为负值
         params={
             "command_name": "base_velocity",  # 对应 CommandManager 中的命令项名称
             "stand_still_scale": 5.0,         # 静止时的放大倍率（静止惩罚力度变为 5 倍）
@@ -631,7 +631,9 @@ class Go2W_EventCfg:
             "pose_range": {
                 "x": (-0.5, 0.5),
                 "y": (-0.5, 0.5),
-                "yaw": (-3.14, 3.14),  # 出生时随机朝向
+                "roll": (-0.3, 0.3),    # 出生时随机姿态
+                "pitch": (-0.3, 0.3),
+                "yaw": (-3.14, 3.14),  
             },
             "velocity_range": {
                 "x": (-0.5, 0.5),
